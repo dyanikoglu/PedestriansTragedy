@@ -15,13 +15,12 @@ GLint const DIRECTION_DOWN = -2;
 GLint const TYPE_PAVEMENT = 1;
 GLint const TYPE_ROAD = 2;
 
-GLint const COLLISION_PAWN_PAWN = 0;
-GLint const COLLISION_PAWN_AGENT = 1;
-GLint const COLLISION_PAWN_WORLDOBJECT = 2;
+GLint const PAWN_CAR = 0;
+GLint const PAWN_TRUCK = 1;
 
 using namespace std;
 
-GLsizei wh = 600, ww = 500; /* initial window size */
+GLsizei wh = 600, ww = 525; /* initial window size */
 
 class Vertex {
 	public:
@@ -72,9 +71,8 @@ class Actor {
 		GLfloat offsetX;
 		GLfloat offsetY;
 		Actor() {};
-		Actor(vector<Vertex> vertices, GLfloat scale, GLfloat offsetX, GLfloat offsetY) {
+		Actor(GLfloat scale, GLfloat offsetX, GLfloat offsetY) {
 			this->scale = scale;
-			this->vertices = vertices;
 			this->offsetX = offsetX;
 			this->offsetY = offsetY;
 		};
@@ -107,20 +105,27 @@ class Actor {
 // Objects controlled by player
 class Agent: public Actor {
 	public:
-		GLfloat stepSize = 25;
-		Agent(vector<Vertex> vertices, GLfloat scale, GLfloat offsetX, GLfloat offsetY) : Actor(vertices, scale, offsetX, offsetY) {};
+		GLfloat stepSize;
+		Agent(GLfloat stepSize, GLfloat scale, GLfloat offsetX, GLfloat offsetY) : Actor(scale, offsetX, offsetY) {
+			this->stepSize = stepSize;
+			this->vertices = { Vertex(0.2,0.1), Vertex(0.5,0.9), Vertex(0.8,0.1) };
+		};
 		void step(int direction) {
 			if (direction == DIRECTION_LEFT) {
-				this->offsetX -= stepSize;
+				if(this->offsetX > 0)
+					this->offsetX -= stepSize;
 			}
 			else if (direction == DIRECTION_RIGHT) {
-				this->offsetX += stepSize;
+				if (this->offsetX < ww - stepSize)
+					this->offsetX += stepSize;
 			}
 			else if (direction == DIRECTION_UP) {
-				this->offsetY += stepSize;
+				if (this->offsetY < wh - stepSize)
+					this->offsetY += stepSize;
 			}
 			else if (direction == DIRECTION_DOWN) {
-				this->offsetY -= stepSize;
+				if (this->offsetY > 0 )
+					this->offsetY -= stepSize;
 			}
 		}
 
@@ -137,11 +142,30 @@ class Pawn :public Actor {
 		GLfloat velocity;
 		GLint direction;
 		GLint color;
-		Pawn(vector<Vertex> vertices, GLfloat scale, GLfloat offsetX, GLfloat offsetY, GLint assignedTo, GLint direction) : Actor(vertices, scale, offsetX, offsetY) {
+		GLint type;
+		Pawn(GLfloat scale, GLfloat offsetX, GLfloat offsetY, GLint assignedTo, GLint direction) : Actor(scale, offsetX, offsetY) {
 			this->assignedTo = assignedTo;
 			this->direction = direction;
 			this->velocity = ((rand() % 6) + 3) * direction;
-			this->color = rand() % 3;
+			this->color = rand() % 6;
+			this->type = rand() % 2;
+
+			if (type == PAWN_CAR) {
+				if (direction == DIRECTION_RIGHT) {
+					this->vertices = { Vertex(0, 0.25), Vertex(0, 0.75), Vertex(0.05, 0.80), Vertex(0.6, 0.80), Vertex(1, 0.70), Vertex(1, 0.30), Vertex(0.6, 0.20), Vertex(0.05, 0.20) };
+				}
+				else if (direction == DIRECTION_LEFT) {
+					this->vertices = { Vertex(1, 0.25), Vertex(1, 0.75), Vertex(0.95, 0.80), Vertex(0.4, 0.80), Vertex(0, 0.70), Vertex(0, 0.30), Vertex(0.4, 0.20), Vertex(0.95, 0.20) };
+				}
+			}
+			else if (type == PAWN_TRUCK) {
+				if (direction == DIRECTION_RIGHT) {
+					this->vertices = { Vertex(0, 0.25), Vertex(0, 0.75), Vertex(0.05, 0.80), Vertex(1.6, 0.80), Vertex(2, 0.70), Vertex(2, 0.30), Vertex(1.6, 0.20), Vertex(0.05, 0.20) };
+				}
+				else if (direction == DIRECTION_LEFT) {
+					this->vertices = { Vertex(2, 0.25), Vertex(2, 0.75), Vertex(1.95, 0.80), Vertex(0.4, 0.80), Vertex(0, 0.70), Vertex(0, 0.30), Vertex(0.4, 0.20), Vertex(1.95, 0.20) };
+				}
+			}		
 		};
 		void move() {
 			this->offsetX += velocity;
@@ -158,6 +182,15 @@ class Pawn :public Actor {
 				case 2:
 					glColor3f(1.0, 1.0, 1.0);
 					break;
+				case 3:
+					glColor3f(1.0, 1.0, 0.0);
+					break;
+				case 4:
+					glColor3f(1.0, 0.0, 1.0);
+					break;
+				case 5:
+					glColor3f(0.0, 1.0, 1.0);
+					break;
 			}
 			Actor::draw();
 		}
@@ -170,7 +203,10 @@ class Pawn :public Actor {
 		vector<Vertex> getCollisionBound() {
 			vector<Vertex> tempVertices;
 			for (vector<Vertex>::iterator vertex = this->vertices.begin(); vertex != this->vertices.end(); ++vertex) {
-				tempVertices.push_back(Vertex((vertex->x * (this->scale + 25)) + this->offsetX - 12.5, (vertex->y * this->scale) + this->offsetY));
+				if(this->type == PAWN_CAR)
+					tempVertices.push_back(Vertex((vertex->x * (this->scale + 25)) + this->offsetX - 12.5, (vertex->y * this->scale) + this->offsetY));
+				else if(this->type == PAWN_TRUCK)
+					tempVertices.push_back(Vertex((vertex->x * (this->scale + 12.5)) + this->offsetX - 6.25, (vertex->y * this->scale) + this->offsetY));
 			}
 			return tempVertices;
 		}
@@ -231,8 +267,7 @@ class World {
 
 			// Create player agent
 			vector<Vertex> initials;
-			initials = { Vertex(0.2,0.1), Vertex(0.5,0.9), Vertex(0.8,0.1) };
-			agent = new Agent(initials, squareSize, 0, 0);
+			agent = new Agent(squareSize, squareSize, ((ww / squareSize) / 2 * squareSize), 0);
 
 			// Decide world layout
 			// TODO Check if lane and pavement count is enough, if not loop again. Store road and pavement counts in world.
@@ -281,33 +316,21 @@ class World {
 			}
 		}
 
-		void spawnTestPawn() {
-			vector<Vertex>initials = { Vertex(0, 0.25), Vertex(0, 0.75), Vertex(1,0.75), Vertex(1,0.25) };
-			pawns.push_back(new Pawn(initials, squareSize, 250, 3 * squareSize, 3, 0));
-		}
-
 		void spawnPawn() {
 			int randomRow = rand() % (wh / this->squareSize);
 			// Selected row is a road
 			if (worldLayout[randomRow] == TYPE_ROAD) {
 				// Road is free to spawn a new car
 				if (roadStatus[randomRow]) {
-					vector<Vertex> initials;
-					if (roadDirection[randomRow] == DIRECTION_RIGHT) {
-						initials = { Vertex(0, 0.25), Vertex(0, 0.75), Vertex(0.05, 0.80), Vertex(0.6, 0.80), Vertex(1, 0.70), Vertex(1, 0.30), Vertex(0.6, 0.20), Vertex(0.05, 0.20) };
-					} 
-					else if (roadDirection[randomRow] == DIRECTION_LEFT) {
-						initials = { Vertex(1, 0.25), Vertex(1, 0.75), Vertex(0.95, 0.80), Vertex(0.4, 0.80), Vertex(0, 0.70), Vertex(0, 0.30), Vertex(0.4, 0.20), Vertex(0.95, 0.20) };
-					}
 					roadStatus[randomRow] = 0; // Road is busy now, set road as busy
 					spawnTimeStamps[randomRow] = this->frameTimer;
 					// Traffic flow is to right
 					if (roadDirection[randomRow] == DIRECTION_RIGHT) {
-						pawns.push_back(new Pawn(initials, squareSize, -squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(squareSize, -2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
 					// Traffic flow is to left
 					else if (roadDirection[randomRow] == DIRECTION_LEFT) {
-						pawns.push_back(new Pawn(initials, squareSize, ww + squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(squareSize, ww + 2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
 				}
 			}
@@ -323,8 +346,6 @@ class World {
 					this->roadStatus[i] = 1;
 				}
 			}
-
-			
 
 			for (vector<Pawn*>::iterator pawn = this->pawns.begin(); pawn != this->pawns.end(); ++pawn) {
 				(*pawn)->move();
@@ -379,7 +400,7 @@ class World {
 
 		void drawWorld() {
 			this->drawWorldObjects();
-			//this->drawGrids();
+			this->drawGrids();
 			this->agent->draw();
 			for (vector<Pawn*>::iterator pawn = this->pawns.begin(); pawn != this->pawns.end(); ++pawn) {
 				(*pawn)->draw();
@@ -389,16 +410,9 @@ class World {
 
 World *world;
 
-void myReshape(GLsizei w, GLsizei h)
+void resize(GLsizei w, GLsizei h)
 {
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluOrtho2D(0.0, (GLdouble)w, 0.0, (GLdouble)h);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-	glViewport(0, 0, w, h);
-	ww = w;
-	wh = h;
+	glutReshapeWindow(ww, wh);
 }
 
 void init(void)
@@ -412,7 +426,6 @@ void init(void)
 
 	world = new World();
 	world->initWorld();
-	//world->spawnTestPawn();
 	glFlush();
 }
 
@@ -454,9 +467,9 @@ int main(int argc, char** argv)
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowSize(ww, wh);
-	glutCreateWindow("Frogger");
+	glutCreateWindow("A Pedestrian's Tragedy");
 	init();
-	glutReshapeFunc(myReshape);
+	glutReshapeFunc(resize);
 	glutDisplayFunc(display);
 	glutSpecialFunc(processSpecialKeys);
 	glutTimerFunc(1000.0 / 60.0, timer, 0);

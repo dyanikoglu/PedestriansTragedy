@@ -50,9 +50,17 @@ class Vertex {
 		};
 };
 
-// Main method for smooth animations seen in the game, interpolates v0 to v1 on t value
-float lerp(float v0, float v1, float t) {
-	return (1 - t) * v0 + t * v1;
+void drawText(char *txt, GLfloat x, GLfloat y, void* font) {
+	char text[32];
+	sprintf(text, "%s", txt);
+	glRasterPos2f(x, y);
+	for (int i = 0; text[i] != '\0'; i++)
+		glutBitmapCharacter(font, text[i]);
+}
+
+// Main method for smooth animations seen in the game, interpolates v0 to v1 on delta value
+float lerp(GLfloat v0, GLfloat v1, GLfloat delta) {
+	return (1 - delta) * v0 + delta * v1;
 }
 
 GLint getOrientation(Vertex p1, Vertex p2, Vertex p3) {
@@ -61,6 +69,24 @@ GLint getOrientation(Vertex p1, Vertex p2, Vertex p3) {
 		return 0; // Colinear
 	}
 	return (result > 0) ? 1 : 2;
+}
+
+GLint contains(Vertex point, vector<Vertex> poly) {
+	Vertex startpoint = poly.at(0);
+	Vertex endpoint = poly.at((1) % poly.size());
+	GLint currOri = getOrientation(startpoint, endpoint, point);
+	for (int i = 1; i < poly.size(); i++) {
+		Vertex startpoint = poly.at(i);
+		Vertex endpoint = poly.at((i+1) % poly.size());
+		GLint tempOri = getOrientation(startpoint, endpoint, point);
+		if (tempOri != currOri) {
+			// Point is outside of polygon
+			return 0;
+		}
+		currOri = tempOri;
+	}
+	// Point is inside polygon
+	return 1;
 }
 
 // Check each line segment of different polygons with each other, if specified orientations are different or zero, this means they're colliding.
@@ -136,7 +162,6 @@ class Agent: public Actor {
 		GLfloat targetY;
 		GLint stateX = AGENT_IDLE;
 		GLint stateY = AGENT_IDLE;
-		GLint hitDirection;
 
 		vector<Vertex> const rotate_up = { Vertex(0.2,0.1), Vertex(0.5,0.9), Vertex(0.8,0.1) };
 		vector<Vertex> const rotate_down = { Vertex(0.2,0.9), Vertex(0.5,0.1), Vertex(0.8,0.9) };
@@ -211,6 +236,48 @@ class Agent: public Actor {
 		}
 };
 
+class Coin :public Actor {
+	public:
+		GLint timeout;
+		GLfloat initialX;
+		GLfloat targetX;
+		Coin(GLfloat radius, GLfloat offsetX, GLfloat offsetY, GLint timeout) : Actor(radius, offsetX, offsetY) {
+			this->initialX = offsetX;
+			this->targetX = offsetX + 10;
+			this->timeout = timeout;
+		}
+
+		void idle() {
+			if (abs(this->offsetX - this->targetX) > 1) {
+				this->offsetX = lerp(this->offsetX, this->targetX, 0.01);
+			}
+			else if(this->targetX == this->initialX + 10){
+				this->targetX = this->initialX;
+			}
+			else {
+				this->targetX = this->initialX + 10;
+			}
+		}
+
+		void draw() {
+			GLint i;
+			GLint triangleAmount = 1000;
+			GLfloat twicePi = 2.0f * 3.14;
+
+			glEnable(GL_LINE_SMOOTH);
+			glLineWidth(5.0);
+
+			glBegin(GL_LINES);
+			glColor4f(1.0, 1.0, 0.0, 1.0);
+			for (i = 0; i <= triangleAmount; i++)
+			{
+				glVertex2f(this->offsetX, this->offsetY);
+				glVertex2f(this->offsetX + (this->scale * cos(i * twicePi / triangleAmount)), this->offsetY + (this->scale * sin(i * twicePi / triangleAmount)));
+			}
+			glEnd();
+		}
+};
+
 // Objects non-controlled by player
 class Pawn :public Actor {
 	public:
@@ -219,10 +286,10 @@ class Pawn :public Actor {
 		GLint direction;
 		GLint color;
 		GLint type;
-		Pawn(GLfloat scale, GLfloat offsetX, GLfloat offsetY, GLint assignedTo, GLint direction) : Actor(scale, offsetX, offsetY) {
+		Pawn(GLint difficulty, GLfloat scale, GLfloat offsetX, GLfloat offsetY, GLint assignedTo, GLint direction) : Actor(scale, offsetX, offsetY) {
 			this->assignedTo = assignedTo;
 			this->direction = direction;
-			this->velocity = ((rand() % 6) + 3) * direction;
+			this->velocity = ((rand() % 6) + difficulty) * direction;
 			this->color = rand() % 6;
 			this->type = rand() % 2;
 
@@ -300,14 +367,15 @@ class WorldObject {
 	public:
 		WorldObject(vector<Vertex> vertices, GLint objectType) {
 			this->objectType = objectType;
-			this->vertices = vertices;
 			if (objectType == WO_PAVEMENT) {
+				this->vertices = vertices;
 			}
 			else if (objectType == WO_ROAD) {
+				this->vertices = vertices;
 			}
 		}
 
-		void draw(GLint startY, GLint squareSize) {
+		void draw() {
 			if (objectType == WO_PAVEMENT) {
 				glColor3f(0, 1, 0);
 			}
@@ -329,28 +397,37 @@ class World {
 	public:
 		Agent *agent;
 		vector<WorldObject*> worldObjects;
+		vector<Coin*> coins;
+		vector<Pawn*> pawns;
 		GLint* worldLayout;
+
 		GLint* roadStatus;
 		GLint* roadDirection;
-		GLint* spawnTimeStamps;
-		vector<Pawn*> pawns;
+		GLint* roadSpawnTimeStamps;
+
+		GLint coinTextTimeout = 0;
+		GLfloat coinTextX = 0;
+		GLfloat coinTextY = 0;
+		
 		GLint squareSize = 25;
 		GLint const leftSpawnPoint = -2 * squareSize;
 		GLint const rightSpawnPoint = ww + 2 * squareSize;
 		GLint frameTimer = 0;
 		GLint state;
+
 		GLint deathAnimDone = 0;
 		GLfloat FOVX = ww;
 		GLfloat LOOKX = 0;
 		GLfloat LOOKY = 0;
 		GLfloat FOVY = wh;
+		GLfloat difficulty = 3;
 
 		void initWorld() {
 			srand(time(NULL));
 			worldLayout = new GLint[wh / this->squareSize];
 			roadStatus = new GLint[wh / this->squareSize];
 			roadDirection = new GLint[wh / this->squareSize];
-			spawnTimeStamps = new GLint[wh / this->squareSize];
+			roadSpawnTimeStamps = new GLint[wh / this->squareSize];
 
 			// Create player agent
 			vector<Vertex> initials;
@@ -364,7 +441,6 @@ class World {
 				GLint consecuviteRoad = 0;
 				GLint randNum = 0;
 				for (GLint i = 0; i < (wh / this->squareSize); i++) {
-					
 					initials = { Vertex(0,i*squareSize), Vertex(0,(i + 1)*squareSize), Vertex(wh,(i + 1)*squareSize), Vertex(wh,i*squareSize) };
 					// First & Last row is always pavement, continue building roads until random number is equal to consecutive road count
 					if (i == 0 || i == (wh / this->squareSize) - 1 || (consecuviteRoad == randNum)) {
@@ -426,10 +502,8 @@ class World {
 		}
 
 		void drawWorldObjects() {
-			GLint y = 0;
 			for (vector<WorldObject*>::iterator obj = this->worldObjects.begin(); obj != this->worldObjects.end(); ++obj) {
-				(*obj)->draw(y, squareSize);
-				y += this->squareSize;
+				(*obj)->draw();
 			}
 		}
 
@@ -440,28 +514,49 @@ class World {
 				// Road is free to spawn a new car
 				if (roadStatus[randomRow]) {
 					roadStatus[randomRow] = 0; // Road is busy now, set road as busy
-					spawnTimeStamps[randomRow] = this->frameTimer;
+					roadSpawnTimeStamps[randomRow] = this->frameTimer;
 					// Traffic flow is to right
 					if (roadDirection[randomRow] == DIRECTION_RIGHT) {
-						pawns.push_back(new Pawn(squareSize, -2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(difficulty, squareSize, -2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
 					// Traffic flow is to left
 					else if (roadDirection[randomRow] == DIRECTION_LEFT) {
-						pawns.push_back(new Pawn(squareSize, ww + 2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(difficulty, squareSize, ww + 2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
 				}
 			}
 		}
 
+		void spawnCoin() {
+			this->coins.push_back(new Coin(5, this->squareSize * (rand() % (ww / squareSize)) + (squareSize / 3), this->squareSize * (rand() % (wh / squareSize)) + (squareSize / 2), this->frameTimer + (rand() % 100) + 600));
+		}
+
 		void updateWorld() {
 			this->frameTimer++;
+
 			// Try spawning a pawn on each 5th frame.
 			if (frameTimer % 5 == 0) {
 				this->spawnPawn();
 			}
+
+			// Try spawning a coin on each 150th frame, remove timed out coins, max spawned coin amount is 6
+			for (int i = 0; i < coins.size(); i++) {
+				// Timeout coin
+				if (coins.at(i)->timeout <= this->frameTimer) {
+					coins.erase(coins.begin() + i);
+				}
+			} if (coins.size() < 6 && frameTimer % 150 == 0) {
+				spawnCoin();
+			}
+
+			// Increase speed of pawns on each 1000th frame
+			if (frameTimer % 1000 == 0) {
+				this->difficulty++;
+			}
+
 			// Set roads as available if some amount of time passed since a pawn is spawned on this road(80 frames).
 			for (GLint i = 0; i < wh / this->squareSize; i++) {
-				if (this->frameTimer - this->spawnTimeStamps[i] > 80) {
+				if (this->frameTimer - this->roadSpawnTimeStamps[i] > 80) {
 					this->roadStatus[i] = 1;
 				}
 			}
@@ -471,7 +566,7 @@ class World {
 				(*pawn)->move();
 			}
 
-			// Move agent with a cool animation
+			// Move agent with a smooth animation
 			if (this->agent->stateY == AGENT_MOVE) {
 				if (abs(this->agent->offsetY - this->agent->targetY) > 1) {
 					this->agent->offsetY = lerp(this->agent->offsetY, this->agent->targetY, 0.4);
@@ -489,6 +584,11 @@ class World {
 					this->agent->offsetX = this->agent->targetX;
 					this->agent->stateX = AGENT_IDLE;
 				}
+			}
+
+			// Animate coins
+			for (int i = 0; i < coins.size(); i++) {
+				coins.at(i)->idle();
 			}
 
 			// Check if there exists a collision
@@ -551,7 +651,19 @@ class World {
 					else {
 						this->agent->vertices = this->agent->rotate_right;
 					}
+
 					this->state = WORLD_STATE_OVER;
+				}
+			}
+
+			// Collision of Agent - Coin
+			for (GLint i = 0; i < this->coins.size(); i++) {
+				GLint result = contains(Vertex(this->coins.at(i)->offsetX, this->coins.at(i)->offsetY), this->agent->getCollisionBound(COL_LOOSE));
+				if (result) {
+					this->coinTextX = coins.at(i)->offsetX;
+					this->coinTextY = coins.at(i)->offsetY;
+					this->coinTextTimeout = frameTimer + 100;
+					this->coins.erase(coins.begin() + i);
 				}
 			}
 		}
@@ -563,13 +675,22 @@ class World {
 			for (vector<Pawn*>::iterator pawn = this->pawns.begin(); pawn != this->pawns.end(); ++pawn) {
 				(*pawn)->draw();
 			}
+			for (vector<Coin*>::iterator coin = this->coins.begin(); coin != this->coins.end(); ++coin) {
+				(*coin)->draw();
+			}
+
+			// Draw coin earned text if it exists
+			if (coinTextTimeout > frameTimer) {
+				glColor3f(1.0f, 1.0f, 0.0f);
+				drawText("+1", coinTextX, coinTextY, GLUT_BITMAP_HELVETICA_12);
+			}
 		}
 };
 
 World *world; // Main world object
 
 void resize(GLsizei w, GLsizei h) {
-	// Do not let user resize window
+	// Do not let user resize the window
 	glutReshapeWindow(ww, wh);
 }
 
@@ -586,21 +707,12 @@ void init(void) {
 	glFlush();
 }
 
-void drawText(char *txt)
-{
-	char text[32];
-	sprintf(text, "%s", txt);
-	glColor3f(1, 0, 0);
-	glRasterPos3f(ww / 2 - 50, wh / 2, 0);
-	for (int i = 0; text[i] != '\0'; i++)
-		glutBitmapCharacter(GLUT_BITMAP_TIMES_ROMAN_24, text[i]);
-}
-
 void display(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	world->drawWorld();
 	if (world->deathAnimDone) {
-		drawText("WASTED");
+		glColor3f(1.0f, 0.0f, 0.0f);
+		drawText("WASTED", world->agent->offsetX - world->squareSize / 2, world->agent->offsetY + 2 * world->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
 	}
 	glFlush();
 	glutSwapBuffers();
@@ -626,7 +738,7 @@ void processSpecialKeys(GLint key, GLint x, GLint y) {
 void mouseInput(GLint button, GLint state, GLint x, GLint y) {
 	switch (button) {
 	case GLUT_MIDDLE_BUTTON:
-		if (state == GLUT_DOWN)
+		if (state == GLUT_DOWN && world->state == WORLD_STATE_RUN)
 			world->state = WORLD_STATE_PAUSE;
 		break;
 	case GLUT_LEFT_BUTTON:
@@ -641,6 +753,7 @@ void mouseInput(GLint button, GLint state, GLint x, GLint y) {
 }
 
 void timer(GLint) {
+	// Agent is alive:
 	if (world->state != WORLD_STATE_PAUSE && world->state != WORLD_STATE_OVER) {
 		if (world->state == WORLD_STATE_ONEFRAME) {
 			// Draw current frame and pause again
@@ -649,6 +762,7 @@ void timer(GLint) {
 		world->updateWorld();
 		glutPostRedisplay();
 	}
+	// Agent is dead:
 	else if (world->state == WORLD_STATE_OVER) {
 		if (abs(world->agent->offsetX - world->agent->targetX) > 2) {
 			world->agent->offsetX = lerp(world->agent->offsetX, world->agent->targetX, 0.07);
@@ -662,25 +776,25 @@ void timer(GLint) {
 			world->LOOKY = lerp(world->LOOKY, -world->agent->offsetY, 0.02);
 		}
 
-		if (world->FOVX > 980 && world->FOVY > 980) {
+		if (world->FOVX > 970 && world->FOVY > 970) {
 			world->deathAnimDone = 1;
 		}
 		glViewport(world->LOOKX, world->LOOKY, world->FOVX, world->FOVY);
 		glutPostRedisplay();
 	}
-	glutTimerFunc(1000.0 / 60.0, timer, 0);
+	glutTimerFunc(1000.0 / 60.0, timer, 0); // 60 FPS
 }
 
 int main(GLint argc, char** argv) {
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowSize(ww, wh);
-	glutCreateWindow("A Pedestrian's Tragedy");
+	glutCreateWindow("Istanbul Traffic Simulator 2017");
 	init();
 	glutReshapeFunc(resize);
 	glutDisplayFunc(display);
 	glutSpecialFunc(processSpecialKeys);
 	glutMouseFunc(mouseInput);
-	glutTimerFunc(1000.0 / 60.0, timer, 0);
+	glutTimerFunc(1000.0 / 60.0, timer, 0); // 60 FPS
 	glutMainLoop();
 }

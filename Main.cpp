@@ -6,6 +6,7 @@
 #include <functional>
 #include <memory>
 #include <mmsystem.h>
+#include <string>
 
 // Actor directions
 GLint const DIRECTION_LEFT = -1;
@@ -16,7 +17,8 @@ GLint const DIRECTION_DOWN = -2;
 // World object types
 GLint const WO_PAVEMENT = 1;
 GLint const WO_ROAD = 2;
-GLint const WO_BUSH = 3;
+GLint const WO_FLORA_TREE_1 = 3;
+GLint const WO_FLORA_TREE_2 = 4;
 
 // World states
 GLint const WORLD_STATE_RUN = 1;
@@ -49,6 +51,23 @@ class Vertex {
 			this->y = y;
 		};
 };
+
+void drawCircle(GLfloat x, GLfloat y, GLfloat r) {
+	GLint i;
+	GLint triangleAmount = 1000;
+	GLfloat twicePi = 2.0f * 3.14;
+
+	glEnable(GL_LINE_SMOOTH);
+	glLineWidth(5.0);
+
+	glBegin(GL_LINES);
+	for (i = 0; i <= triangleAmount; i++)
+	{
+		glVertex2f(x, y);
+		glVertex2f(x + (r * cos(i * twicePi / triangleAmount)), y + (r * sin(i * twicePi / triangleAmount)));
+	}
+	glEnd();
+}
 
 void drawText(char *txt, GLfloat x, GLfloat y, void* font) {
 	char text[32];
@@ -160,39 +179,72 @@ class Agent: public Actor {
 		GLint direction;
 		GLfloat targetX;
 		GLfloat targetY;
+		GLfloat initialScale;
+		GLfloat targetScale;
 		GLint stateX = AGENT_IDLE;
 		GLint stateY = AGENT_IDLE;
+		vector<Vertex> blockedSquares;
+		GLint triedToGoBack;
+		GLint deathAnimFlag;
 
 		vector<Vertex> const rotate_up = { Vertex(0.2,0.1), Vertex(0.5,0.9), Vertex(0.8,0.1) };
 		vector<Vertex> const rotate_down = { Vertex(0.2,0.9), Vertex(0.5,0.1), Vertex(0.8,0.9) };
 		vector<Vertex> const rotate_left = { Vertex(0.9,0.2), Vertex(0.1,0.5), Vertex(0.9,0.8) };
 		vector<Vertex> const rotate_right = { Vertex(0.1,0.2), Vertex(0.9,0.5), Vertex(0.1,0.8) };
 
-		Agent(GLfloat stepSize, GLfloat scale, GLfloat offsetX, GLfloat offsetY) : Actor(scale, offsetX, offsetY) {
+		Agent(GLfloat stepSize, GLfloat scale, GLfloat offsetX, GLfloat offsetY, vector<Vertex> blockedSquares) : Actor(scale, offsetX, offsetY) {
 			this->targetX = offsetX;
 			this->targetY = offsetY;
+			this->initialScale = scale;
 			this->stepSize = stepSize;
 			this->direction = DIRECTION_UP;
 			this->vertices = rotate_up;
+			this->blockedSquares = blockedSquares;
+			this->triedToGoBack = 0;
+			this->targetScale = scale * 1.75;
+			this->deathAnimFlag = 0;
 		};
 		// TODO Rotate agent to left and right
-		void step(GLint direction) {
+		GLint step(GLint direction) {
 			if (direction == DIRECTION_LEFT) {
+				// Decline input if if target location is blocked
+				for (vector<Vertex>::iterator move = this->blockedSquares.begin(); move != this->blockedSquares.end(); ++move) {
+					if (move->x == offsetX - stepSize && move->y == this->offsetY) {
+						return 0;
+					}
+				}
+
 				if (this->stateX != AGENT_MOVE && this->offsetX > 0) {
 					this->vertices = rotate_left;
 					this->targetX = this->offsetX - stepSize;
 					this->stateX = AGENT_MOVE;
+					return 1;
 				}
 			}
 			else if (direction == DIRECTION_RIGHT) {
+				// Decline input if if target location is blocked
+				for (vector<Vertex>::iterator move = this->blockedSquares.begin(); move != this->blockedSquares.end(); ++move) {
+					if (move->x == offsetX + stepSize && move->y == this->offsetY) {
+						return 0;
+					}
+				}
+
 				if (this->stateX != AGENT_MOVE && this->offsetX < ww - stepSize) {
 					this->vertices = rotate_right;
 					this->targetX = this->offsetX + stepSize;
 					this->stateX = AGENT_MOVE;
+					return 1;
 				}
 			}
 			else if (direction == DIRECTION_UP) {
-				if (this->stateY != AGENT_MOVE && this->direction == DIRECTION_UP  && this->offsetY < wh - stepSize) {
+				// Decline input if if target location is blocked
+				for (vector<Vertex>::iterator move = this->blockedSquares.begin(); move != this->blockedSquares.end(); ++move) {
+					if (move->x == offsetX && move->y == this->offsetY + stepSize) {
+						return 0;
+					}
+				}
+
+				if (this->stateY != AGENT_MOVE  && this->offsetY < wh - stepSize) {
 					this->vertices = rotate_up;
 					this->targetY = this->offsetY + stepSize;
 					stateY = AGENT_MOVE;
@@ -201,9 +253,17 @@ class Agent: public Actor {
 						this->vertices = rotate_down;
 						this->direction = DIRECTION_DOWN;
 					}
+					return 1;
 				}
 			}
 			else if (direction == DIRECTION_DOWN) {
+				// Decline input if if target location is blocked
+				for (vector<Vertex>::iterator move = this->blockedSquares.begin(); move != this->blockedSquares.end(); ++move) {
+					if (move->x == offsetX && move->y == this->offsetY - stepSize) {
+						return 0;
+					}
+				}
+
 				if (this->stateY != AGENT_MOVE && this->direction == DIRECTION_DOWN && this->offsetY > 0) {
 					this->vertices = rotate_down;
 					this->targetY = this->offsetY - stepSize;
@@ -213,6 +273,7 @@ class Agent: public Actor {
 						this->vertices = rotate_up;
 						this->direction = DIRECTION_UP;
 					}
+					return 1;
 				}
 			}
 		}
@@ -241,10 +302,17 @@ class Coin :public Actor {
 		GLint timeout;
 		GLfloat initialX;
 		GLfloat targetX;
-		Coin(GLfloat radius, GLfloat offsetX, GLfloat offsetY, GLint timeout) : Actor(radius, offsetX, offsetY) {
+		GLfloat targetY;
+		GLfloat targetRadius;
+		GLint points;
+		GLint isTaken;
+		Coin(GLfloat radius, GLfloat offsetX, GLfloat offsetY, GLint timeout, GLint points) : Actor(radius, offsetX, offsetY) {
 			this->initialX = offsetX;
 			this->targetX = offsetX + 10;
 			this->timeout = timeout;
+			this->points = points;
+			this->isTaken = 0;
+			this->targetRadius = radius + 10;
 		}
 
 		void idle() {
@@ -259,22 +327,15 @@ class Coin :public Actor {
 			}
 		}
 
+		void taken() {
+			this->offsetX = lerp(this->offsetX, this->targetX, 0.05);
+			this->offsetY = lerp(this->offsetY, this->targetY, 0.05);
+			this->scale = lerp(this->scale, this->targetRadius, 0.05);
+		}
+
 		void draw() {
-			GLint i;
-			GLint triangleAmount = 1000;
-			GLfloat twicePi = 2.0f * 3.14;
-
-			glEnable(GL_LINE_SMOOTH);
-			glLineWidth(5.0);
-
-			glBegin(GL_LINES);
-			glColor4f(1.0, 1.0, 0.0, 1.0);
-			for (i = 0; i <= triangleAmount; i++)
-			{
-				glVertex2f(this->offsetX, this->offsetY);
-				glVertex2f(this->offsetX + (this->scale * cos(i * twicePi / triangleAmount)), this->offsetY + (this->scale * sin(i * twicePi / triangleAmount)));
-			}
-			glEnd();
+			glColor3f(1.0, 1.0, 0.0);
+			drawCircle(this->offsetX, this->offsetY, this->scale);
 		}
 };
 
@@ -338,7 +399,7 @@ class Pawn :public Actor {
 			Actor::draw();
 		}
 
-		// Pull the pawn a little back in the reverse direction of it's velocity
+		// Pull the pawn a little back in the reverse direction of it's velocity, required for pawn-pawn collision handling
 		void pullBack() {
 			this->offsetX -= this->velocity;
 		}
@@ -362,9 +423,12 @@ class Pawn :public Actor {
 
 // Static objects in game world
 class WorldObject {
-	GLint objectType;
-	vector<Vertex> vertices;
 	public:
+		GLint objectType;
+		vector<Vertex> vertices;
+		GLint offsetX;
+		GLint offsetY;
+	
 		WorldObject(vector<Vertex> vertices, GLint objectType) {
 			this->objectType = objectType;
 			if (objectType == WO_PAVEMENT) {
@@ -373,14 +437,67 @@ class WorldObject {
 			else if (objectType == WO_ROAD) {
 				this->vertices = vertices;
 			}
+			else if (objectType == WO_FLORA_TREE_1 || objectType == WO_FLORA_TREE_2) {
+				this->offsetX = vertices.at(0).x;
+				this->offsetY = vertices.at(0).y;
+			}
 		}
 
 		void draw() {
 			if (objectType == WO_PAVEMENT) {
-				glColor3f(0, 1, 0);
+				glColor3f(0.0f, 1.0f, 0.0f);
 			}
-			else {
-				glColor3f(0.5, 0.5, 0.5);
+			else if(objectType == WO_ROAD) {
+				glColor3f(0.5f, 0.5f, 0.5f);
+			}
+			else if (objectType == WO_FLORA_TREE_1) {
+				GLint r = 20;
+				glColor3f(0, 0.5f, 0);
+				drawCircle(this->offsetX, this->offsetY, r);
+
+				glBegin(GL_TRIANGLES);
+				glVertex2f(this->offsetX + r / 2, this->offsetY + 0.8*r);
+				glVertex2f(this->offsetX + r / 2, this->offsetY - 0.8*r);
+				glVertex2f(this->offsetX + 2*r, this->offsetY);
+
+				glVertex2f(this->offsetX - r / 2, this->offsetY - 0.8*r);
+				glVertex2f(this->offsetX - r / 2, this->offsetY + 0.8*r);
+				glVertex2f(this->offsetX - 2 * r, this->offsetY);
+
+				glVertex2f(this->offsetX + 0.8*r, this->offsetY + r / 2);
+				glVertex2f(this->offsetX - 0.8*r, this->offsetY + r / 2 );
+				glVertex2f(this->offsetX, this->offsetY + 2 * r);
+
+				glVertex2f(this->offsetX - 0.8*r, this->offsetY - r / 2);
+				glVertex2f(this->offsetX + 0.8*r, this->offsetY - r / 2);
+				glVertex2f(this->offsetX, this->offsetY - 2 * r);
+				glEnd();
+
+				glColor3f(0.2f, 0.0f, 0);
+				glBegin(GL_POINTS);
+				glVertex2f(this->offsetX, this->offsetY);
+				glEnd();
+				return;
+			}
+			else if (objectType == WO_FLORA_TREE_2) {
+				GLint r = 20;
+				glColor3f(0, 0.5f, 0);
+				drawCircle(this->offsetX, this->offsetY, r);
+
+				drawCircle(this->offsetX + r, this->offsetY, r / 2);
+				drawCircle(this->offsetX + r, this->offsetY + r / 1.2, r / 2);
+				drawCircle(this->offsetX - r, this->offsetY, r / 2);
+				drawCircle(this->offsetX - r, this->offsetY + r / 1.2, r / 2);
+				drawCircle(this->offsetX, this->offsetY + r, r / 2);
+				drawCircle(this->offsetX + r, this->offsetY - r / 1.2, r / 2);
+				drawCircle(this->offsetX - r, this->offsetY - r / 1.2, r / 2);
+				drawCircle(this->offsetX, this->offsetY - r, r / 2);
+
+				glColor3f(0.2f, 0.0f, 0);
+				glBegin(GL_POINTS);
+				glVertex2f(this->offsetX, this->offsetY);
+				glEnd();
+				return;
 			}
 
 			glBegin(GL_POLYGON);
@@ -396,10 +513,13 @@ class WorldObject {
 class World {
 	public:
 		Agent *agent;
-		vector<WorldObject*> worldObjects;
+		vector<WorldObject*> worldObjects_roadsPavs;
+		vector<WorldObject*> worldObjects_trees;
 		vector<Coin*> coins;
 		vector<Pawn*> pawns;
 		GLint* worldLayout;
+		GLint wSquareCount;
+		GLint hSquareCount;
 
 		GLint* roadStatus;
 		GLint* roadDirection;
@@ -408,11 +528,12 @@ class World {
 		GLint coinTextTimeout = 0;
 		GLfloat coinTextX = 0;
 		GLfloat coinTextY = 0;
+		GLint score;
 		
-		GLint squareSize = 25;
+		GLint squareSize;
 		GLint const leftSpawnPoint = -2 * squareSize;
 		GLint const rightSpawnPoint = ww + 2 * squareSize;
-		GLint frameTimer = 0;
+		GLint frameTimer;
 		GLint state;
 
 		GLint deathAnimDone = 0;
@@ -420,34 +541,71 @@ class World {
 		GLfloat LOOKX = 0;
 		GLfloat LOOKY = 0;
 		GLfloat FOVY = wh;
-		GLfloat difficulty = 3;
+		GLfloat difficulty;
+
+		World(GLint squareSize, GLint startDifficulty) {
+			this->squareSize = squareSize;
+			this->difficulty = startDifficulty;
+			this->frameTimer = 0;
+			this->score = 0;
+			initWorld(); // Initialize the world
+		}
 
 		void initWorld() {
 			srand(time(NULL));
-			worldLayout = new GLint[wh / this->squareSize];
-			roadStatus = new GLint[wh / this->squareSize];
-			roadDirection = new GLint[wh / this->squareSize];
-			roadSpawnTimeStamps = new GLint[wh / this->squareSize];
 
-			// Create player agent
-			vector<Vertex> initials;
-			agent = new Agent(squareSize, squareSize, ((ww / squareSize) / 2 * squareSize), 0);
+			PlaySound(TEXT("ambience.wav"), NULL, SND_LOOP | SND_ASYNC);
+
+			wSquareCount = ww / this->squareSize; // Total square count of width
+			hSquareCount = wh / this->squareSize; // Total square count of heigth
+
+			worldLayout = new GLint[hSquareCount];
+			roadStatus = new GLint[hSquareCount];
+			roadDirection = new GLint[hSquareCount];
+			roadSpawnTimeStamps = new GLint[hSquareCount];
+
+			vector<Vertex> initials; // Temp vector for defining object vertices
+			vector<Vertex> blockedSquares; // User cant pass through these squares
 
 			// Decide world layout
 			GLint sidewalks = 0;
 			while (sidewalks < 6) {
-				this->worldObjects.clear();
+				this->worldObjects_roadsPavs.clear();
 				sidewalks = 0;
 				GLint consecuviteRoad = 0;
 				GLint randNum = 0;
-				for (GLint i = 0; i < (wh / this->squareSize); i++) {
+				for (GLint i = 0; i < (hSquareCount); i++) {
 					initials = { Vertex(0,i*squareSize), Vertex(0,(i + 1)*squareSize), Vertex(wh,(i + 1)*squareSize), Vertex(wh,i*squareSize) };
 					// First & Last row is always pavement, continue building roads until random number is equal to consecutive road count
-					if (i == 0 || i == (wh / this->squareSize) - 1 || (consecuviteRoad == randNum)) {
+					if (i == 0 || i == (hSquareCount) - 1 || (consecuviteRoad == randNum)) {
 						worldLayout[i] = WO_PAVEMENT;
 						roadStatus[i] = -1;
 						roadDirection[i] = 0;
-						this->worldObjects.push_back(new WorldObject(initials, WO_PAVEMENT));
+						this->worldObjects_roadsPavs.push_back(new WorldObject(initials, WO_PAVEMENT));
+
+						if (i != hSquareCount - 2) {
+							GLint treeCount = rand() % 3 + 1;
+							for (int j = 0; j < treeCount; j++) {
+								GLint treeType = rand() % 2;
+								initials.clear();
+
+								GLint place = (rand() % (wSquareCount / 3)) * 3; // A tree can't be closer than 3 squares to other trees
+								if (i == 0 && place == wSquareCount / 2 + 1) {
+									place++;
+								}
+
+								blockedSquares.push_back(Vertex((place - 1) * squareSize, squareSize * i)); // User can't pass through this tree
+
+								initials.push_back(Vertex(squareSize * place - squareSize / 2, squareSize * i + squareSize / 2));
+								if (treeType == 0) {
+									this->worldObjects_trees.push_back(new WorldObject(initials, WO_FLORA_TREE_1));
+								}
+								else {
+									this->worldObjects_trees.push_back(new WorldObject(initials, WO_FLORA_TREE_2));
+								}
+							}
+						}
+
 						consecuviteRoad = 0;
 						sidewalks++;
 						randNum = (rand() % 2) + 3;
@@ -455,12 +613,16 @@ class World {
 					else {
 						worldLayout[i] = WO_ROAD;
 						roadStatus[i] = 1;
-						this->worldObjects.push_back(new WorldObject(initials, WO_ROAD));
+						this->worldObjects_roadsPavs.push_back(new WorldObject(initials, WO_ROAD));
 						roadDirection[i] = 1 - 2 * (rand() % 2);
 						consecuviteRoad++;
 					}
 				}
 			}
+
+			// Create player agent
+			agent = new Agent(squareSize, squareSize, ((wSquareCount) / 2 * squareSize), 0, blockedSquares);
+
 			this->state = WORLD_STATE_RUN;
 		};
 
@@ -498,17 +660,25 @@ class World {
 				}
 				row++;
 			}
-			glLineWidth(1); // Roll back line width change
+			glLineWidth(1); // Roll back line width change, it includes roads and pavements
 		}
 
-		void drawWorldObjects() {
-			for (vector<WorldObject*>::iterator obj = this->worldObjects.begin(); obj != this->worldObjects.end(); ++obj) {
+		// First layer of world objects
+		void drawWorldObjects_Layer1() {
+			for (vector<WorldObject*>::iterator obj = this->worldObjects_roadsPavs.begin(); obj != this->worldObjects_roadsPavs.end(); ++obj) {
+				(*obj)->draw();		
+			}
+		}
+
+		// Second(upper) layer of world objects, it includes trees
+		void drawWorldObjects_Layer2() {
+			for (vector<WorldObject*>::iterator obj = this->worldObjects_trees.begin(); obj != this->worldObjects_trees.end(); ++obj) {
 				(*obj)->draw();
 			}
 		}
 
 		void spawnPawn() {
-			GLint randomRow = rand() % (wh / this->squareSize);
+			GLint randomRow = rand() % (hSquareCount);
 			// Selected row is a road
 			if (worldLayout[randomRow] == WO_ROAD) {
 				// Road is free to spawn a new car
@@ -528,9 +698,10 @@ class World {
 		}
 
 		void spawnCoin() {
-			this->coins.push_back(new Coin(5, this->squareSize * (rand() % (ww / squareSize)) + (squareSize / 3), this->squareSize * (rand() % (wh / squareSize)) + (squareSize / 2), this->frameTimer + (rand() % 100) + 600));
+			this->coins.push_back(new Coin(5, this->squareSize * (rand() % wSquareCount) + (squareSize / 3), this->squareSize * (rand() % (hSquareCount)) + (squareSize / 2), this->frameTimer + (rand() % 100) + 600, 5));
 		}
 
+		// Called on each frame, updates the world object
 		void updateWorld() {
 			this->frameTimer++;
 
@@ -549,13 +720,13 @@ class World {
 				spawnCoin();
 			}
 
-			// Increase speed of pawns on each 1000th frame
-			if (frameTimer % 1000 == 0) {
+			// Increase speed of pawns on each 2000th frame
+			if (frameTimer % 2000 == 0 && this->difficulty < 4) {
 				this->difficulty++;
 			}
 
 			// Set roads as available if some amount of time passed since a pawn is spawned on this road(80 frames).
-			for (GLint i = 0; i < wh / this->squareSize; i++) {
+			for (GLint i = 0; i < hSquareCount; i++) {
 				if (this->frameTimer - this->roadSpawnTimeStamps[i] > 80) {
 					this->roadStatus[i] = 1;
 				}
@@ -587,8 +758,30 @@ class World {
 			}
 
 			// Animate coins
+			vector<GLint> toRemove;
 			for (int i = 0; i < coins.size(); i++) {
-				coins.at(i)->idle();
+				if (coins.at(i)->isTaken) {
+					coins.at(i)->taken();
+					if (abs(coins.at(i)->offsetX - coins.at(i)->targetX) < 5) {
+						toRemove.push_back(i);
+					}
+				}
+				else {
+					coins.at(i)->idle();
+				}
+			}
+
+			// Delete taken coins
+			for (vector<GLint>::iterator ind = toRemove.begin(); ind != toRemove.end(); ++ind) {
+				coins.erase(coins.begin() + (*ind));
+			}
+			toRemove.clear();
+
+			// Do not let player to go back from it's direction
+			if (this->agent->triedToGoBack) {
+				cout << "aa";
+				this->state = WORLD_STATE_OVER;
+				return;
 			}
 
 			// Check if there exists a collision
@@ -596,7 +789,7 @@ class World {
 		}
 
 		void checkCollisions() {
-			// Collision of Spawn Point - Pawn
+			// Collision of Spawn Point - Pawn, delete pawn pointer from vector
 			for (GLint i = 0; i < this->pawns.size(); i++) {
 				if (pawns.at(i)->direction == DIRECTION_LEFT) {
 					if ((pawns.at(i)->getVertex(0).x * pawns.at(i)->scale) + pawns.at(i)->offsetX <= leftSpawnPoint) {
@@ -616,7 +809,7 @@ class World {
 				}
 			}
 
-			// Collision of Pawn - Pawn
+			// Collision of Pawn - Pawn, equalize these pawns' velocities
 			for (GLint i = 0; i < this->pawns.size();i++) {
 				for (GLint j = i+1; j < this->pawns.size(); j++) {
 					// If pawns are on same road-line
@@ -639,7 +832,7 @@ class World {
 				}
 			}
 
-			// Collision of Pawn - Agent
+			// Collision of Pawn - Agent, kill agent
 			for (GLint i = 0; i < this->pawns.size(); i++) {
 				GLint result = checkIntersection(this->pawns.at(i)->getCollisionBound(COL_STRICT), this->agent->getCollisionBound(COL_STRICT));
 				if (result) {
@@ -663,13 +856,23 @@ class World {
 					this->coinTextX = coins.at(i)->offsetX;
 					this->coinTextY = coins.at(i)->offsetY;
 					this->coinTextTimeout = frameTimer + 100;
-					this->coins.erase(coins.begin() + i);
+					this->score += coins.at(i)->points;
+					coins.at(i)->isTaken = 1;
+					coins.at(i)->targetX = 0;
+					coins.at(i)->targetY = wh;
 				}
 			}
 		}
 
+		void showScore() {
+			char scoreText[21];
+			sprintf(scoreText, "Score: %d", this->score);
+			glColor3f(1.0f, 1.0f, 0.0f);
+			drawText(scoreText, 0, wh - 0.75*this->squareSize, GLUT_BITMAP_HELVETICA_18);
+		}
+
 		void drawWorld() {
-			this->drawWorldObjects();
+			this->drawWorldObjects_Layer1();
 			this->drawRoadLines();
 			this->agent->draw();
 			for (vector<Pawn*>::iterator pawn = this->pawns.begin(); pawn != this->pawns.end(); ++pawn) {
@@ -678,12 +881,15 @@ class World {
 			for (vector<Coin*>::iterator coin = this->coins.begin(); coin != this->coins.end(); ++coin) {
 				(*coin)->draw();
 			}
+			this->drawWorldObjects_Layer2();
 
 			// Draw coin earned text if it exists
 			if (coinTextTimeout > frameTimer) {
 				glColor3f(1.0f, 1.0f, 0.0f);
-				drawText("+1", coinTextX, coinTextY, GLUT_BITMAP_HELVETICA_12);
+				drawText("+5", coinTextX, coinTextY, GLUT_BITMAP_HELVETICA_18);
 			}
+
+			this->showScore();
 		}
 };
 
@@ -701,9 +907,7 @@ void init(void) {
 	gluOrtho2D(0.0, (GLdouble)ww, 0.0, (GLdouble)wh);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
-	world = new World();
-	world->initWorld();
-	PlaySound(TEXT("ambience.wav"), NULL, SND_LOOP | SND_ASYNC);
+	world = new World(25, 3);
 	glFlush();
 }
 
@@ -712,19 +916,41 @@ void display(void) {
 	world->drawWorld();
 	if (world->deathAnimDone) {
 		glColor3f(1.0f, 0.0f, 0.0f);
-		drawText("WASTED", world->agent->offsetX - world->squareSize / 2, world->agent->offsetY + 2 * world->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
+		if (world->agent->triedToGoBack) {
+			drawText("Don't be a coward", world->agent->offsetX - world->squareSize * 1.25, world->agent->offsetY + 2 * world->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
+		}
+		else {
+			drawText("WASTED", world->agent->offsetX - world->squareSize / 2, world->agent->offsetY + 2 * world->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
+		}
+		char scoreText[21];
+		sprintf(scoreText, "Your score: %d", world->score);
+		glColor3f(1.0f, 0.0f, 0.0f);
+		drawText(scoreText, world->agent->offsetX - world->squareSize / 1.70, world->agent->offsetY + 1.5 * world->squareSize, GLUT_BITMAP_HELVETICA_18);
 	}
 	glFlush();
 	glutSwapBuffers();
 }
 
 void processSpecialKeys(GLint key, GLint x, GLint y) {
+	if (world->agent->triedToGoBack) {
+		return;
+	}
 	switch (key) {
 	case GLUT_KEY_UP:
-		world->agent->step(DIRECTION_UP);
+		if (world->agent->direction == DIRECTION_DOWN && world->agent->offsetY != wh - world->squareSize) {
+			PlaySound(TEXT("wasted.wav"), NULL, SND_ASYNC);
+			world->agent->triedToGoBack = 1;
+		}
+		else if (world->agent->step(DIRECTION_UP) && world->agent->offsetY != wh - world->squareSize)
+			world->score++; // Increase score if direction of agent and movement is same
 		break;
 	case GLUT_KEY_DOWN:
-		world->agent->step(DIRECTION_DOWN);
+		if (world->agent->direction == DIRECTION_UP && world->agent->offsetY != 0) {
+			PlaySound(TEXT("wasted.wav"), NULL, SND_ASYNC);
+			world->agent->triedToGoBack = 1;
+		}
+		else if (world->agent->step(DIRECTION_DOWN) && world->agent->offsetY != 0)
+			world->score++; // Increase score if direction of agent and movement is same
 		break;
 	case GLUT_KEY_RIGHT:
 		world->agent->step(DIRECTION_RIGHT);
@@ -762,11 +988,25 @@ void timer(GLint) {
 		world->updateWorld();
 		glutPostRedisplay();
 	}
-	// Agent is dead:
+	// Agent is dead, do some animation stuff:
 	else if (world->state == WORLD_STATE_OVER) {
-		if (abs(world->agent->offsetX - world->agent->targetX) > 2) {
-			world->agent->offsetX = lerp(world->agent->offsetX, world->agent->targetX, 0.07);
+		if (!world->agent->triedToGoBack) {
+			if (abs(world->agent->offsetX - world->agent->targetX) > 2) {
+				world->agent->offsetX = lerp(world->agent->offsetX, world->agent->targetX, 0.025);
+			}
+			if (world->agent->deathAnimFlag == 0) {
+				if (abs(world->agent->scale - world->agent->targetScale) > 1) {
+					world->agent->scale = lerp(world->agent->scale, world->agent->targetScale, 0.08);
+				}
+				else {
+					world->agent->deathAnimFlag = 1;
+				}
+			}
+			else {
+				world->agent->scale = lerp(world->agent->scale, world->agent->initialScale, 0.08);
+			}
 		}
+
 		if (world->FOVX < 1000 && world->FOVY < 1000) {
 			world->FOVX = lerp(world->FOVX, 1000, 0.02);
 			world->FOVY = lerp(world->FOVY, 1000, 0.02);

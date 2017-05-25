@@ -1,5 +1,8 @@
-# A Pedestrian's Tragedy by Doğa Can YANIKOĞLU
+# A Pedestrian's Tragedy
 
+![Game Screenshot](https://i.hizliresim.com/AL9zjX.png)
+
+A road crossing game developed with OpenGL on C++.
 
 ## Contents
 
@@ -69,3 +72,17 @@ V. Bugs & Known Issues
 - Rarely, no car or truck spawns after launch of the game. Relaunching resolves this problem.
 - If player keeps pressed to up or down button, and reaches to end of the world while it's still pressed, game will over unexpectedly.
 - Rarely, cars can be spawned repeatedly in same place(because of random spawn system). One of them will wait other one until the collision ends.
+
+## Licence
+
+Copyright (C) 2017 Doğa Can YANIKOĞLU
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see http://www.gnu.org/licenses/
+
+## Contributing
+
+Contributors are encouraged to fork this repository and issue pull requests.

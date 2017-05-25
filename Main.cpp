@@ -15,33 +15,34 @@ GLint const DIRECTION_UP = 2;
 GLint const DIRECTION_DOWN = -2;
 
 // World object types
-GLint const WO_PAVEMENT = 1;
-GLint const WO_ROAD = 2;
-GLint const WO_FLORA_TREE_1 = 3;
-GLint const WO_FLORA_TREE_2 = 4;
+GLint const WO_PAVEMENT = 1; // World Object - Pavement type
+GLint const WO_ROAD = 2; // World Object - Road type
+GLint const WO_FLORA_TREE_1 = 3; // World Object - Flora - Tree type 1
+GLint const WO_FLORA_TREE_2 = 4; // World Object - Flora - Tree type 2
 
 // World states
-GLint const WORLD_STATE_RUN = 1;
-GLint const WORLD_STATE_PAUSE = 0;
-GLint const WORLD_STATE_OVER = 3;
-GLint const WORLD_STATE_ONEFRAME = 2;
+GLint const WORLD_STATE_RUN = 1; // Game is in running state
+GLint const WORLD_STATE_PAUSE = 0; // Game is paused
+GLint const WORLD_STATE_OVER = 3; // Game is over
+GLint const WORLD_STATE_ONEFRAME = 2; // Progress game just 1 frame
 
 // Pawn types
-GLint const PAWN_CAR = 0;
-GLint const PAWN_TRUCK = 1;
+GLint const PAWN_CAR = 0; // Pawn type is car
+GLint const PAWN_TRUCK = 1; // Pawn type is truck
 
 //Agent states
-GLint const AGENT_MOVE = 1;
-GLint const AGENT_IDLE = 0;
+GLint const AGENT_MOVE = 1; // Agent movement animation is in progress
+GLint const AGENT_IDLE = 0; // Agent is in idle state
 
 // Collision types
-GLint const COL_LOOSE = 0;
-GLint const COL_STRICT = 1;
+GLint const COL_LOOSE = 0; // Loose collision area(bigger than initial polygon)
+GLint const COL_STRICT = 1; // Strict collision area(same with initial polygon)
 
 using namespace std;
 
-GLsizei wh = 600, ww = 525; // initial window size
+GLsizei wh = 600, ww = 525; // initial window size, resizing is disabled
 
+// Main class for vertex structure used in game world
 class Vertex {
 	public:
 		GLfloat x;
@@ -52,6 +53,7 @@ class Vertex {
 		};
 };
 
+// Draws a circle with r radius
 void drawCircle(GLfloat x, GLfloat y, GLfloat r) {
 	GLint i;
 	GLint triangleAmount = 1000;
@@ -69,6 +71,7 @@ void drawCircle(GLfloat x, GLfloat y, GLfloat r) {
 	glEnd();
 }
 
+// Draws a bitmap text on given coordinates of screen with given font as parameters
 void drawText(char *txt, GLfloat x, GLfloat y, void* font) {
 	char text[32];
 	sprintf(text, "%s", txt);
@@ -82,6 +85,7 @@ float lerp(GLfloat v0, GLfloat v1, GLfloat delta) {
 	return (1 - delta) * v0 + delta * v1;
 }
 
+// Classic orientation function
 GLint getOrientation(Vertex p1, Vertex p2, Vertex p3) {
 	GLint result = (p2.y - p1.y) * (p3.x - p2.x) - (p2.x - p1.x) * (p3.y - p2.y);
 	if (result == 0) {
@@ -90,6 +94,7 @@ GLint getOrientation(Vertex p1, Vertex p2, Vertex p3) {
 	return (result > 0) ? 1 : 2;
 }
 
+// Checks if points is in polygon
 GLint contains(Vertex point, vector<Vertex> poly) {
 	Vertex startpoint = poly.at(0);
 	Vertex endpoint = poly.at((1) % poly.size());
@@ -116,7 +121,8 @@ GLint checkIntersection(vector<Vertex> p1, vector<Vertex> p2) {
 			GLint ori1 = getOrientation(p1[i], p1[(i + 1) % p1.size()], p2[j]);
 			GLint ori2 = getOrientation(p1[i], p1[(i + 1) % p1.size()], p2[(j+1) % p2.size()]);
 
-			// TODO Add check for 0 orientation, removed for pawns because they're parallel
+			// No need to check "0 orientation"
+
 			if (ori1 != ori2) {
 				// From second polygon
 				GLint ori3 = getOrientation(p2[j], p2[(j + 1) % p2.size()], p1[i]);
@@ -154,18 +160,8 @@ class Actor {
 		};
 
 		void draw() {
-			// DEBUG: Draw Collision Bounds of actors
-			/*glBegin(GL_POLYGON);
-			for (vector<Vertex>::iterator vertex = this->vertices.begin(); vertex != this->vertices.end(); ++vertex) {
-				glColor3f(1, 0, 0);
-				glVertex2f((vertex->x * (this->scale + 25)) + offsetX - 12.5, (vertex->y *  (this->scale)) + offsetY );
-			}
-			glEnd();*/
-
-			// Draw Actual object
 			glBegin(GL_POLYGON);
 			for (vector<Vertex>::iterator vertex = this->vertices.begin(); vertex != this->vertices.end(); ++vertex) {
-				//glColor3f(0, 0, 1); // DEBUG: Draw Collision Bounds of actors
 				glVertex2f((vertex->x * this->scale) + offsetX, (vertex->y * this->scale) + offsetY);
 			}
 			glEnd();
@@ -625,25 +621,6 @@ class World {
 
 			this->state = WORLD_STATE_RUN;
 		};
-
-		// DEBUG: Draw grids on screen
-		void drawGrids() {
-			for (GLint curr = 0; curr <= wh; curr += squareSize) {
-				glColor3f(0.2, 0.0, 0.0);
-				glBegin(GL_LINES);
-				glVertex2f(0, curr);
-				glVertex2f(ww, curr);
-				glEnd();
-			}
-
-			for (GLint curr = 0; curr <= ww; curr += squareSize) {
-				glColor3f(0.2, 0.0, 0.0);
-				glBegin(GL_LINES);
-				glVertex2f(curr, 0);
-				glVertex2f(curr, wh);
-				glEnd();
-			}
-		}
 
 		void drawRoadLines() {
 			GLint row = 1;

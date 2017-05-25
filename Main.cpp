@@ -139,7 +139,7 @@ GLint checkIntersection(vector<Vertex> p1, vector<Vertex> p2) {
 	return 0;
 }
 
-
+// Parent class
 class Actor {
 	public:
 		vector<Vertex> vertices; // Unit polygon (It's like a miniature polygon, it's scaled and moved into right direction with offset values)
@@ -200,7 +200,7 @@ class Agent: public Actor {
 			this->targetScale = scale * 1.75;
 			this->deathAnimFlag = 0;
 		};
-		// TODO Rotate agent to left and right
+
 		GLint step(GLint direction) {
 			if (direction == DIRECTION_LEFT) {
 				// Decline input if if target location is blocked
@@ -504,7 +504,6 @@ class WorldObject {
 		}
 };
 
-
 // Main world object
 class World {
 	public:
@@ -563,7 +562,7 @@ class World {
 			vector<Vertex> initials; // Temp vector for defining object vertices
 			vector<Vertex> blockedSquares; // User cant pass through these squares
 
-			// Decide world layout
+			// Decide world layout, repeat until requirements are are met.
 			GLint sidewalks = 0;
 			while (sidewalks < 6) {
 				this->worldObjects_roadsPavs.clear();
@@ -640,7 +639,7 @@ class World {
 			glLineWidth(1); // Roll back line width change, it includes roads and pavements
 		}
 
-		// First layer of world objects
+		// First(lower) layer of world objects
 		void drawWorldObjects_Layer1() {
 			for (vector<WorldObject*>::iterator obj = this->worldObjects_roadsPavs.begin(); obj != this->worldObjects_roadsPavs.end(); ++obj) {
 				(*obj)->draw();		
@@ -756,7 +755,6 @@ class World {
 
 			// Do not let player to go back from it's direction
 			if (this->agent->triedToGoBack) {
-				cout << "aa";
 				this->state = WORLD_STATE_OVER;
 				return;
 			}
@@ -770,7 +768,7 @@ class World {
 			for (GLint i = 0; i < this->pawns.size(); i++) {
 				if (pawns.at(i)->direction == DIRECTION_LEFT) {
 					if ((pawns.at(i)->getVertex(0).x * pawns.at(i)->scale) + pawns.at(i)->offsetX <= leftSpawnPoint) {
-						Pawn* ref = pawns.at(i); // TODO Check if this really works
+						Pawn* ref = pawns.at(i);
 						roadStatus[ref->assignedTo] = 1;
 						pawns.erase(pawns.begin() + i);
 						delete ref;
@@ -884,7 +882,7 @@ void init(void) {
 	gluOrtho2D(0.0, (GLdouble)ww, 0.0, (GLdouble)wh);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
-	world = new World(25, 3);
+	world = new World(25, 1);
 	glFlush();
 }
 
@@ -909,7 +907,8 @@ void display(void) {
 }
 
 void processSpecialKeys(GLint key, GLint x, GLint y) {
-	if (world->agent->triedToGoBack) {
+	// If game is over, ignore player input
+	if (world->state == WORLD_STATE_OVER) {
 		return;
 	}
 	switch (key) {
@@ -936,6 +935,11 @@ void processSpecialKeys(GLint key, GLint x, GLint y) {
 		world->agent->step(DIRECTION_LEFT);
 		break;
 	}
+}
+
+void processNormalKeys(unsigned char key, int x, int y) {
+	if (key == 113 || key == 81) // ASCII Q = 81, ASCII q = 113
+		exit(0);
 }
 
 void mouseInput(GLint button, GLint state, GLint x, GLint y) {
@@ -1011,6 +1015,7 @@ int main(GLint argc, char** argv) {
 	glutReshapeFunc(resize);
 	glutDisplayFunc(display);
 	glutSpecialFunc(processSpecialKeys);
+	glutKeyboardFunc(processNormalKeys);
 	glutMouseFunc(mouseInput);
 	glutTimerFunc(1000.0 / 60.0, timer, 0); // 60 FPS
 	glutMainLoop();

@@ -14,8 +14,6 @@ III. Game Rules
 
 IV. Controls
 
-V. Bugs & Known Issues
-
 
 
 I. Implementation Details
@@ -69,10 +67,6 @@ IV. Controls
 - Left Mouse Button -> (If paused) Continue game
 - Right Mouse Button -> (If paused) Advance game by 1 frame
 
-
-V. Bugs & Known Issues
------------------------
-- Sometimes no car or truck appears on screen after launch of the game.
 
 ## Licence
 

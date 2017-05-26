@@ -575,8 +575,8 @@ class World {
 		GLint score;
 		
 		GLint squareSize;
-		GLint const leftSpawnPoint = -2 * squareSize;
-		GLint const rightSpawnPoint = ww + 2 * squareSize;
+		GLint leftSpawnPoint;
+		GLint rightSpawnPoint;
 		GLint frameTimer;
 		GLint state;
 
@@ -589,6 +589,8 @@ class World {
 
 		World(GLint squareSize, GLint startDifficulty) {
 			this->squareSize = squareSize;
+			this->leftSpawnPoint = -2 * squareSize;
+			this->rightSpawnPoint = ww;
 			this->difficulty = startDifficulty;
 			this->frameTimer = 0;
 			this->score = 0;
@@ -713,11 +715,11 @@ class World {
 				if (roadStatus[randomRow]) {
 					// Traffic flow is to right
 					if (roadDirection[randomRow] == DIRECTION_RIGHT) {
-						pawns.push_back(new Pawn(difficulty, squareSize, -2 * squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(difficulty, squareSize, leftSpawnPoint, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
 					// Traffic flow is to left
 					else if (roadDirection[randomRow] == DIRECTION_LEFT) {
-						pawns.push_back(new Pawn(difficulty, squareSize, ww + 2 * squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(difficulty, squareSize, rightSpawnPoint, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
 					roadStatus[randomRow] = 0; // Road is busy now, set road as busy
 					roadSpawnTimeStamps[randomRow] = this->frameTimer;

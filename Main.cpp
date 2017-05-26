@@ -8,6 +8,27 @@
 #include <mmsystem.h>
 #include <string>
 
+#include <fmod.hpp>
+#include <fmod_errors.h>
+
+// Sound effect pointers
+FMOD::System *FMODSystem;
+FMOD::Channel *ambienceChannel = 0;
+FMOD::Channel *footStepChannel = 0;
+FMOD::Channel *gameOverChannel = 0;
+FMOD::Channel *effectChannel = 0;
+FMOD_RESULT result;
+FMOD::Sound *ambience;
+FMOD::Sound *footstepGrass;
+FMOD::Sound *footstepRoad;
+FMOD::Sound *coinPick;
+FMOD::Sound *horn1;
+FMOD::Sound *horn2;
+FMOD::Sound *horn3;
+FMOD::Sound *horn4;
+FMOD::Sound *gameOver;
+FMOD::Sound *carHit;
+
 // Actor directions
 GLint const DIRECTION_LEFT = -1;
 GLint const DIRECTION_RIGHT = 1;
@@ -37,6 +58,7 @@ GLint const AGENT_IDLE = 0; // Agent is in idle state
 // Collision types
 GLint const COL_LOOSE = 0; // Loose collision area(bigger than initial polygon)
 GLint const COL_STRICT = 1; // Strict collision area(same with initial polygon)
+GLint const COL_LONG = 2; // Loose collision area(longer than COL_LOOSþ
 
 using namespace std;
 
@@ -177,10 +199,11 @@ class Agent: public Actor {
 		GLfloat targetY;
 		GLfloat initialScale;
 		GLfloat targetScale;
+		GLint currentRow = 0;
 		GLint stateX = AGENT_IDLE;
 		GLint stateY = AGENT_IDLE;
 		vector<Vertex> blockedSquares;
-		GLint triedToGoBack;
+		GLint triedToGoBack = 0;
 		GLint deathAnimFlag;
 
 		vector<Vertex> const rotate_up = { Vertex(0.2,0.1), Vertex(0.5,0.9), Vertex(0.8,0.1) };
@@ -196,7 +219,6 @@ class Agent: public Actor {
 			this->direction = DIRECTION_UP;
 			this->vertices = rotate_up;
 			this->blockedSquares = blockedSquares;
-			this->triedToGoBack = 0;
 			this->targetScale = scale * 1.75;
 			this->deathAnimFlag = 0;
 		};
@@ -243,12 +265,13 @@ class Agent: public Actor {
 				if (this->stateY != AGENT_MOVE  && this->offsetY < wh - stepSize) {
 					this->vertices = rotate_up;
 					this->targetY = this->offsetY + stepSize;
-					stateY = AGENT_MOVE;
 					// Time to change direction of agent
 					if (this->targetY == wh - stepSize) {
 						this->vertices = rotate_down;
 						this->direction = DIRECTION_DOWN;
 					}
+					this->stateY = AGENT_MOVE;
+					this->currentRow++;
 					return 1;
 				}
 			}
@@ -263,12 +286,13 @@ class Agent: public Actor {
 				if (this->stateY != AGENT_MOVE && this->direction == DIRECTION_DOWN && this->offsetY > 0) {
 					this->vertices = rotate_down;
 					this->targetY = this->offsetY - stepSize;
-					stateY = AGENT_MOVE;
 					// Time to change direction of agent
 					if (this->targetY == 0) {
 						this->vertices = rotate_up;
 						this->direction = DIRECTION_UP;
 					}
+					this->stateY = AGENT_MOVE;
+					this->currentRow--;
 					return 1;
 				}
 			}
@@ -343,12 +367,16 @@ class Pawn :public Actor {
 		GLint direction;
 		GLint color;
 		GLint type;
+		GLint honked;
+
 		Pawn(GLint difficulty, GLfloat scale, GLfloat offsetX, GLfloat offsetY, GLint assignedTo, GLint direction) : Actor(scale, offsetX, offsetY) {
 			this->assignedTo = assignedTo;
 			this->direction = direction;
 			this->velocity = ((rand() % 6) + difficulty) * direction;
 			this->color = rand() % 6;
 			this->type = rand() % 2;
+
+			this->honked = 0;
 
 			if (type == PAWN_CAR) {
 				if (direction == DIRECTION_RIGHT) {
@@ -365,8 +393,9 @@ class Pawn :public Actor {
 				else if (direction == DIRECTION_LEFT) {
 					this->vertices = { Vertex(2, 0.25), Vertex(2, 0.75), Vertex(1.95, 0.80), Vertex(0.4, 0.80), Vertex(0, 0.70), Vertex(0, 0.30), Vertex(0.4, 0.20), Vertex(1.95, 0.20) };
 				}
-			}		
+			}	
 		};
+
 		void move() {
 			this->offsetX += velocity;
 		}
@@ -383,7 +412,7 @@ class Pawn :public Actor {
 					glColor3f(1.0, 1.0, 1.0);
 					break;
 				case 3:
-					glColor3f(1.0, 1.0, 0.0);
+					glColor3f(1.0, 0.75, 0.0);
 					break;
 				case 4:
 					glColor3f(1.0, 0.0, 1.0);
@@ -411,6 +440,24 @@ class Pawn :public Actor {
 				}
 				else if (collisionType == COL_STRICT) {
 					tempVertices.push_back(Vertex((vertex->x * this->scale) + this->offsetX, (vertex->y * this->scale) + this->offsetY));
+				}
+				else if (collisionType == COL_LONG) {
+					if (this->type == PAWN_CAR) {
+						if (this->direction == DIRECTION_LEFT) {
+							tempVertices.push_back(Vertex((vertex->x * (this->scale + 50)) + this->offsetX - 100, (vertex->y * this->scale) + this->offsetY));
+						}
+						else {
+							tempVertices.push_back(Vertex((vertex->x * (this->scale + 50)) + this->offsetX + 100, (vertex->y * this->scale) + this->offsetY));
+						}
+					}
+					else if (this->type == PAWN_TRUCK) {
+						if (this->direction == DIRECTION_LEFT) {
+							tempVertices.push_back(Vertex((vertex->x * (this->scale + 25)) + this->offsetX - 50, (vertex->y * this->scale) + this->offsetY));
+						}
+						else {
+							tempVertices.push_back(Vertex((vertex->x * (this->scale + 25)) + this->offsetX + 50, (vertex->y * this->scale) + this->offsetY));
+						}
+					}
 				}
 			}
 			return tempVertices;
@@ -549,7 +596,8 @@ class World {
 		void initWorld() {
 			srand(time(NULL));
 
-			PlaySound(TEXT("ambience.wav"), NULL, SND_LOOP | SND_ASYNC);
+			FMODSystem->playSound(ambience, 0, false, &ambienceChannel);
+			ambienceChannel->setVolume(0.5f);
 
 			wSquareCount = ww / this->squareSize; // Total square count of width
 			hSquareCount = wh / this->squareSize; // Total square count of heigth
@@ -617,7 +665,6 @@ class World {
 
 			// Create player agent
 			agent = new Agent(squareSize, squareSize, ((wSquareCount) / 2 * squareSize), 0, blockedSquares);
-
 			this->state = WORLD_STATE_RUN;
 		};
 
@@ -659,16 +706,16 @@ class World {
 			if (worldLayout[randomRow] == WO_ROAD) {
 				// Road is free to spawn a new car
 				if (roadStatus[randomRow]) {
-					roadStatus[randomRow] = 0; // Road is busy now, set road as busy
-					roadSpawnTimeStamps[randomRow] = this->frameTimer;
 					// Traffic flow is to right
 					if (roadDirection[randomRow] == DIRECTION_RIGHT) {
-						pawns.push_back(new Pawn(difficulty, squareSize, -2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(difficulty, squareSize, -2 * squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
 					// Traffic flow is to left
 					else if (roadDirection[randomRow] == DIRECTION_LEFT) {
-						pawns.push_back(new Pawn(difficulty, squareSize, ww + 2*squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
+						pawns.push_back(new Pawn(difficulty, squareSize, ww + 2 * squareSize, randomRow * squareSize, randomRow, roadDirection[randomRow]));
 					}
+					roadStatus[randomRow] = 0; // Road is busy now, set road as busy
+					roadSpawnTimeStamps[randomRow] = this->frameTimer;
 				}
 			}
 		}
@@ -753,12 +800,6 @@ class World {
 			}
 			toRemove.clear();
 
-			// Do not let player to go back from it's direction
-			if (this->agent->triedToGoBack) {
-				this->state = WORLD_STATE_OVER;
-				return;
-			}
-
 			// Check if there exists a collision
 			this->checkCollisions();
 		}
@@ -768,25 +809,21 @@ class World {
 			for (GLint i = 0; i < this->pawns.size(); i++) {
 				if (pawns.at(i)->direction == DIRECTION_LEFT) {
 					if ((pawns.at(i)->getVertex(0).x * pawns.at(i)->scale) + pawns.at(i)->offsetX <= leftSpawnPoint) {
-						Pawn* ref = pawns.at(i);
-						roadStatus[ref->assignedTo] = 1;
+						roadStatus[pawns.at(i)->assignedTo] = 1;
 						pawns.erase(pawns.begin() + i);
-						delete ref;
 					}
 				}
-				else {
+				else if(pawns.at(i)->direction == DIRECTION_RIGHT){
 					if ((pawns.at(i)->getVertex(0).x * pawns.at(i)->scale) + pawns.at(i)->offsetX >= rightSpawnPoint) {
-						Pawn* ref = pawns.at(i);
-						roadStatus[ref->assignedTo] = 1;
+						roadStatus[pawns.at(i)->assignedTo] = 1;
 						pawns.erase(pawns.begin() + i);
-						delete ref;
 					}
 				}
 			}
 
 			// Collision of Pawn - Pawn, equalize these pawns' velocities
-			for (GLint i = 0; i < this->pawns.size();i++) {
-				for (GLint j = i+1; j < this->pawns.size(); j++) {
+			for (GLint i = 0; i < this->pawns.size(); i++) {
+				for (GLint j = i + 1; j < this->pawns.size(); j++) {
 					// If pawns are on same road-line
 					if (this->pawns.at(i)->assignedTo == this->pawns.at(j)->assignedTo) {
 						GLint result = checkIntersection(this->pawns.at(i)->getCollisionBound(COL_LOOSE), this->pawns.at(j)->getCollisionBound(COL_LOOSE));
@@ -807,27 +844,63 @@ class World {
 				}
 			}
 
-			// Collision of Pawn - Agent, kill agent
-			for (GLint i = 0; i < this->pawns.size(); i++) {
-				GLint result = checkIntersection(this->pawns.at(i)->getCollisionBound(COL_STRICT), this->agent->getCollisionBound(COL_STRICT));
-				if (result) {
-					PlaySound(TEXT("wasted.wav"), NULL, SND_ASYNC);
-					this->agent->targetX = this->agent->offsetX + 20 * this->pawns.at(i)->velocity;
-					if (this->pawns.at(i)->direction == DIRECTION_LEFT) {
-						this->agent->vertices = this->agent->rotate_left;
-					}
-					else {
-						this->agent->vertices = this->agent->rotate_right;
-					}
+			// Collision of Pawn - Agent, honk horn or kill agent
+			if (this->state != WORLD_STATE_OVER) {
+				for (GLint i = 0; i < this->pawns.size(); i++) {
+					if (this->pawns.at(i)->assignedTo == this->agent->currentRow) {
+						GLint intersectionResult = checkIntersection(this->pawns.at(i)->getCollisionBound(COL_STRICT), this->agent->getCollisionBound(COL_STRICT));
+						if (this->pawns.at(i)->honked == 0) {
+							GLint hornResult = checkIntersection(this->pawns.at(i)->getCollisionBound(COL_LONG), this->agent->getCollisionBound(COL_STRICT));
+							if (hornResult) {
+								this->pawns.at(i)->honked = 1;
 
-					this->state = WORLD_STATE_OVER;
+								if (rand() % 2 == 0) {
+									GLint hornType = rand() % 4;
+									switch (hornType) {
+									case 0:
+										FMODSystem->playSound(horn1, 0, false, &effectChannel);
+										break;
+									case 1:
+										FMODSystem->playSound(horn2, 0, false, &effectChannel);
+										break;
+									case 2:
+										FMODSystem->playSound(horn3, 0, false, &effectChannel);
+										break;
+									case 3:
+										FMODSystem->playSound(horn4, 0, false, &effectChannel);
+										break;
+									default:
+										break;
+									}
+								}
+								
+							}
+						}
+						if (intersectionResult) {
+							ambienceChannel->setVolume(0.15f);
+							FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
+							FMODSystem->playSound(carHit, 0, false, &effectChannel);
+							this->agent->targetX = this->agent->offsetX + 20 * this->pawns.at(i)->velocity;
+							this->pawns.at(i)->velocity = 0;
+							if (this->pawns.at(i)->direction == DIRECTION_LEFT) {
+								this->agent->vertices = this->agent->rotate_left;
+							}
+							else {
+								this->agent->vertices = this->agent->rotate_right;
+							}
+
+							this->state = WORLD_STATE_OVER;
+						}
+					}
 				}
 			}
+
 
 			// Collision of Agent - Coin
 			for (GLint i = 0; i < this->coins.size(); i++) {
 				GLint result = contains(Vertex(this->coins.at(i)->offsetX, this->coins.at(i)->offsetY), this->agent->getCollisionBound(COL_LOOSE));
 				if (result) {
+					FMODSystem->playSound(coinPick, 0, false, &effectChannel);
 					this->coinTextX = coins.at(i)->offsetX;
 					this->coinTextY = coins.at(i)->offsetY;
 					this->coinTextTimeout = frameTimer + 100;
@@ -913,25 +986,55 @@ void processSpecialKeys(GLint key, GLint x, GLint y) {
 	}
 	switch (key) {
 	case GLUT_KEY_UP:
-		if (world->agent->direction == DIRECTION_DOWN && world->agent->offsetY != wh - world->squareSize) {
-			PlaySound(TEXT("wasted.wav"), NULL, SND_ASYNC);
+		if (world->agent->direction == DIRECTION_DOWN && world->agent->stateY != AGENT_MOVE && world->agent->offsetY != wh - world->squareSize) {
+			ambienceChannel->setVolume(0.15f);
+			FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
 			world->agent->triedToGoBack = 1;
+			world->state = WORLD_STATE_OVER;
 		}
-		else if (world->agent->step(DIRECTION_UP) && world->agent->offsetY != wh - world->squareSize)
+		else if (world->agent->step(DIRECTION_UP) == 1 && world->agent->offsetY != wh - world->squareSize) {
+			if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
+				FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+			}
+			else {
+				FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+			}
 			world->score++; // Increase score if direction of agent and movement is same
+		}
 		break;
 	case GLUT_KEY_DOWN:
-		if (world->agent->direction == DIRECTION_UP && world->agent->offsetY != 0) {
-			PlaySound(TEXT("wasted.wav"), NULL, SND_ASYNC);
+		if (world->agent->direction == DIRECTION_UP && world->agent->stateY != AGENT_MOVE && world->agent->offsetY != 0) {
+			ambienceChannel->setVolume(0.15f);
+			FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
 			world->agent->triedToGoBack = 1;
+			world->state = WORLD_STATE_OVER;
 		}
-		else if (world->agent->step(DIRECTION_DOWN) && world->agent->offsetY != 0)
+		else if (world->agent->step(DIRECTION_DOWN) == 1 && world->agent->offsetY != 0) {
+			if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
+				FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+			}
+			else {
+				FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+			}
 			world->score++; // Increase score if direction of agent and movement is same
+		}
 		break;
 	case GLUT_KEY_RIGHT:
+		if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
+			FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+		}
+		else {
+			FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+		}
 		world->agent->step(DIRECTION_RIGHT);
 		break;
 	case GLUT_KEY_LEFT:
+		if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
+			FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+		}
+		else {
+			FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+		}
 		world->agent->step(DIRECTION_LEFT);
 		break;
 	}
@@ -960,8 +1063,10 @@ void mouseInput(GLint button, GLint state, GLint x, GLint y) {
 }
 
 void timer(GLint) {
+	FMODSystem->update();
+
 	// Agent is alive:
-	if (world->state != WORLD_STATE_PAUSE && world->state != WORLD_STATE_OVER) {
+	if (world->state != WORLD_STATE_PAUSE) {
 		if (world->state == WORLD_STATE_ONEFRAME) {
 			// Draw current frame and pause again
 			world->state = WORLD_STATE_PAUSE;
@@ -970,7 +1075,7 @@ void timer(GLint) {
 		glutPostRedisplay();
 	}
 	// Agent is dead, do some animation stuff:
-	else if (world->state == WORLD_STATE_OVER) {
+	if (world->state == WORLD_STATE_OVER) {
 		if (!world->agent->triedToGoBack) {
 			if (abs(world->agent->offsetX - world->agent->targetX) > 2) {
 				world->agent->offsetX = lerp(world->agent->offsetX, world->agent->targetX, 0.025);
@@ -1006,7 +1111,28 @@ void timer(GLint) {
 	glutTimerFunc(1000.0 / 60.0, timer, 0); // 60 FPS
 }
 
+void initSounds() {
+	unsigned int      version;
+	void             *extradriverdata = 0;
+	result = FMOD::System_Create(&FMODSystem);
+	result = FMODSystem->getVersion(&version);
+
+	FMODSystem->init(32, FMOD_INIT_NORMAL, extradriverdata);
+	FMODSystem->createStream("media/ambience.wav", FMOD_DEFAULT, 0, &ambience);
+	ambience->setMode(FMOD_LOOP_NORMAL);                         
+	FMODSystem->createSound("media/gameOver.wav", FMOD_DEFAULT, 0, &gameOver);
+	FMODSystem->createSound("media/coin.wav", FMOD_DEFAULT, 0, &coinPick);
+	FMODSystem->createSound("media/hit.wav", FMOD_DEFAULT, 0, &carHit);
+	FMODSystem->createSound("media/footstep_grass.wav", FMOD_DEFAULT, 0, &footstepGrass);
+	FMODSystem->createSound("media/footstep_road.wav", FMOD_DEFAULT, 0, &footstepRoad);
+	FMODSystem->createSound("media/horn_1.wav", FMOD_DEFAULT, 0, &horn1);
+	FMODSystem->createSound("media/horn_2.wav", FMOD_DEFAULT, 0, &horn2);
+	FMODSystem->createSound("media/horn_3.wav", FMOD_DEFAULT, 0, &horn3);
+	FMODSystem->createSound("media/horn_4.wav", FMOD_DEFAULT, 0, &horn4);
+}
+
 int main(GLint argc, char** argv) {
+	initSounds();
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowSize(ww, wh);

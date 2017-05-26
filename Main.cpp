@@ -116,7 +116,7 @@ GLint getOrientation(Vertex p1, Vertex p2, Vertex p3) {
 	return (result > 0) ? 1 : 2;
 }
 
-// Checks if points is in polygon
+// Checks if point is in polygon
 GLint contains(Vertex point, vector<Vertex> poly) {
 	Vertex startpoint = poly.at(0);
 	Vertex endpoint = poly.at((1) % poly.size());
@@ -161,7 +161,7 @@ GLint checkIntersection(vector<Vertex> p1, vector<Vertex> p2) {
 	return 0;
 }
 
-// Parent class
+// Parent class for dynamic objects in game world
 class Actor {
 	public:
 		vector<Vertex> vertices; // Unit polygon (It's like a miniature polygon, it's scaled and moved into right direction with offset values)
@@ -335,6 +335,7 @@ class Coin :public Actor {
 			this->targetRadius = radius + 10;
 		}
 
+		// Idle animation of coin
 		void idle() {
 			if (abs(this->offsetX - this->targetX) > 1) {
 				this->offsetX = lerp(this->offsetX, this->targetX, 0.01);
@@ -347,6 +348,7 @@ class Coin :public Actor {
 			}
 		}
 
+		// Pick up animation of coin
 		void taken() {
 			this->offsetX = lerp(this->offsetX, this->targetX, 0.05);
 			this->offsetY = lerp(this->offsetY, this->targetY, 0.05);
@@ -367,7 +369,7 @@ class Pawn :public Actor {
 		GLint direction;
 		GLint color;
 		GLint type;
-		GLint honked;
+		GLint honked; // Is this pawn tried honking it's horn?
 
 		Pawn(GLint difficulty, GLfloat scale, GLfloat offsetX, GLfloat offsetY, GLint assignedTo, GLint direction) : Actor(scale, offsetX, offsetY) {
 			this->assignedTo = assignedTo;
@@ -593,14 +595,15 @@ class World {
 			initWorld(); // Initialize the world
 		}
 
+		// Initialize the game world
 		void initWorld() {
 			srand(time(NULL));
 
 			FMODSystem->playSound(ambience, 0, false, &ambienceChannel);
 			ambienceChannel->setVolume(0.5f);
 
-			wSquareCount = ww / this->squareSize; // Total square count of width
-			hSquareCount = wh / this->squareSize; // Total square count of heigth
+			wSquareCount = ww / this->squareSize; // Total square count of window width
+			hSquareCount = wh / this->squareSize; // Total square count of window heigth
 
 			worldLayout = new GLint[hSquareCount];
 			roadStatus = new GLint[hSquareCount];
@@ -668,6 +671,7 @@ class World {
 			this->state = WORLD_STATE_RUN;
 		};
 
+		// Draw road lines
 		void drawRoadLines() {
 			GLint row = 1;
 			glColor3f(1.0f, 1.0f, 1.0f);
@@ -700,6 +704,7 @@ class World {
 			}
 		}
 
+		// Create a random pawn and push it into data structure
 		void spawnPawn() {
 			GLint randomRow = rand() % (hSquareCount);
 			// Selected row is a road
@@ -720,6 +725,7 @@ class World {
 			}
 		}
 
+		// Create a coin and push it into data structure
 		void spawnCoin() {
 			this->coins.push_back(new Coin(5, this->squareSize * (rand() % wSquareCount) + (squareSize / 3), this->squareSize * (rand() % (hSquareCount)) + (squareSize / 2), this->frameTimer + (rand() % 100) + 600, 5));
 		}
@@ -794,7 +800,7 @@ class World {
 				}
 			}
 
-			// Delete taken coins
+			// Delete picked coins from data structure
 			for (vector<GLint>::iterator ind = toRemove.begin(); ind != toRemove.end(); ++ind) {
 				coins.erase(coins.begin() + (*ind));
 			}
@@ -805,7 +811,7 @@ class World {
 		}
 
 		void checkCollisions() {
-			// Collision of Spawn Point - Pawn, delete pawn pointer from vector
+			// Collision of Spawn Point - Pawn, delete pawn pointer from the vector
 			for (GLint i = 0; i < this->pawns.size(); i++) {
 				if (pawns.at(i)->direction == DIRECTION_LEFT) {
 					if ((pawns.at(i)->getVertex(0).x * pawns.at(i)->scale) + pawns.at(i)->offsetX <= leftSpawnPoint) {
@@ -849,13 +855,15 @@ class World {
 				for (GLint i = 0; i < this->pawns.size(); i++) {
 					if (this->pawns.at(i)->assignedTo == this->agent->currentRow) {
 						GLint intersectionResult = checkIntersection(this->pawns.at(i)->getCollisionBound(COL_STRICT), this->agent->getCollisionBound(COL_STRICT));
+						
+						// Pawns can honk their horn if agent is close to front side of pawn, do an extra collision check for this:
 						if (this->pawns.at(i)->honked == 0) {
 							GLint hornResult = checkIntersection(this->pawns.at(i)->getCollisionBound(COL_LONG), this->agent->getCollisionBound(COL_STRICT));
 							if (hornResult) {
-								this->pawns.at(i)->honked = 1;
-
+								this->pawns.at(i)->honked = 1; // Each pawn can try their chance for honking horn one time.
+								// %50 chance:
 								if (rand() % 2 == 0) {
-									GLint hornType = rand() % 4;
+									GLint hornType = rand() % 4; // Random horn type
 									switch (hornType) {
 									case 0:
 										FMODSystem->playSound(horn1, 0, false, &effectChannel);
@@ -876,12 +884,14 @@ class World {
 								
 							}
 						}
+						// Pawn hits to agent:
 						if (intersectionResult) {
 							ambienceChannel->setVolume(0.15f);
 							FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
 							FMODSystem->playSound(carHit, 0, false, &effectChannel);
 							this->agent->targetX = this->agent->offsetX + 20 * this->pawns.at(i)->velocity;
 							this->pawns.at(i)->velocity = 0;
+							// Rotate agent to right direction:
 							if (this->pawns.at(i)->direction == DIRECTION_LEFT) {
 								this->agent->vertices = this->agent->rotate_left;
 							}
@@ -896,7 +906,7 @@ class World {
 			}
 
 
-			// Collision of Agent - Coin
+			// Collision of Agent - Coin, pick up the coin
 			for (GLint i = 0; i < this->coins.size(); i++) {
 				GLint result = contains(Vertex(this->coins.at(i)->offsetX, this->coins.at(i)->offsetY), this->agent->getCollisionBound(COL_LOOSE));
 				if (result) {
@@ -912,6 +922,7 @@ class World {
 			}
 		}
 
+		// Show score on screen
 		void showScore() {
 			char scoreText[21];
 			sprintf(scoreText, "Score: %d", this->score);
@@ -919,6 +930,7 @@ class World {
 			drawText(scoreText, 0, wh - 0.75*this->squareSize, GLUT_BITMAP_HELVETICA_18);
 		}
 
+		// Draw each object in game world into screen
 		void drawWorld() {
 			this->drawWorldObjects_Layer1();
 			this->drawRoadLines();
@@ -931,7 +943,7 @@ class World {
 			}
 			this->drawWorldObjects_Layer2();
 
-			// Draw coin earned text if it exists
+			// Draw coin earned text (+5) if it exists
 			if (coinTextTimeout > frameTimer) {
 				glColor3f(1.0f, 1.0f, 0.0f);
 				drawText("+5", coinTextX, coinTextY, GLUT_BITMAP_HELVETICA_18);
@@ -955,13 +967,15 @@ void init(void) {
 	gluOrtho2D(0.0, (GLdouble)ww, 0.0, (GLdouble)wh);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
-	world = new World(25, 1);
+	world = new World(25, 1); // Create game world
 	glFlush();
 }
 
 void display(void) {
 	glClear(GL_COLOR_BUFFER_BIT);
 	world->drawWorld();
+
+	// If death animation of agent is completed, show paraphrase and score on screen:
 	if (world->deathAnimDone) {
 		glColor3f(1.0f, 0.0f, 0.0f);
 		if (world->agent->triedToGoBack) {
@@ -975,6 +989,7 @@ void display(void) {
 		glColor3f(1.0f, 0.0f, 0.0f);
 		drawText(scoreText, world->agent->offsetX - world->squareSize / 1.70, world->agent->offsetY + 1.5 * world->squareSize, GLUT_BITMAP_HELVETICA_18);
 	}
+
 	glFlush();
 	glutSwapBuffers();
 }
@@ -984,14 +999,17 @@ void processSpecialKeys(GLint key, GLint x, GLint y) {
 	if (world->state == WORLD_STATE_OVER) {
 		return;
 	}
+
 	switch (key) {
 	case GLUT_KEY_UP:
+		// Agent tried to go wrong direction:
 		if (world->agent->direction == DIRECTION_DOWN && world->agent->stateY != AGENT_MOVE && world->agent->offsetY != wh - world->squareSize) {
 			ambienceChannel->setVolume(0.15f);
 			FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
 			world->agent->triedToGoBack = 1;
 			world->state = WORLD_STATE_OVER;
 		}
+		// Move agent:
 		else if (world->agent->step(DIRECTION_UP) == 1 && world->agent->offsetY != wh - world->squareSize) {
 			if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
 				FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
@@ -1003,12 +1021,14 @@ void processSpecialKeys(GLint key, GLint x, GLint y) {
 		}
 		break;
 	case GLUT_KEY_DOWN:
+		// Agent tried to go wrong direction:
 		if (world->agent->direction == DIRECTION_UP && world->agent->stateY != AGENT_MOVE && world->agent->offsetY != 0) {
 			ambienceChannel->setVolume(0.15f);
 			FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
 			world->agent->triedToGoBack = 1;
 			world->state = WORLD_STATE_OVER;
 		}
+		// Move agent:
 		else if (world->agent->step(DIRECTION_DOWN) == 1 && world->agent->offsetY != 0) {
 			if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
 				FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
@@ -1063,7 +1083,7 @@ void mouseInput(GLint button, GLint state, GLint x, GLint y) {
 }
 
 void timer(GLint) {
-	FMODSystem->update();
+	FMODSystem->update(); // Sync FMOD on each frame
 
 	// Agent is alive:
 	if (world->state != WORLD_STATE_PAUSE) {
@@ -1111,6 +1131,7 @@ void timer(GLint) {
 	glutTimerFunc(1000.0 / 60.0, timer, 0); // 60 FPS
 }
 
+// Initialize sound effects with FMOD
 void initSounds() {
 	unsigned int      version;
 	void             *extradriverdata = 0;

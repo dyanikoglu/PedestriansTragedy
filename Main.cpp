@@ -7,17 +7,12 @@
 #include <memory>
 #include <mmsystem.h>
 #include <string>
-
-#include <fmod.hpp>
-#include <fmod_errors.h>
+#include "FMOD\fmod.hpp"
 
 // Sound effect pointers
 FMOD::System *FMODSystem;
 FMOD::Channel *ambienceChannel = 0;
-FMOD::Channel *footStepChannel = 0;
-FMOD::Channel *gameOverChannel = 0;
 FMOD::Channel *effectChannel = 0;
-FMOD_RESULT result;
 FMOD::Sound *ambience;
 FMOD::Sound *footstepGrass;
 FMOD::Sound *footstepRoad;
@@ -58,7 +53,7 @@ GLint const AGENT_IDLE = 0; // Agent is in idle state
 // Collision types
 GLint const COL_LOOSE = 0; // Loose collision area(bigger than initial polygon)
 GLint const COL_STRICT = 1; // Strict collision area(same with initial polygon)
-GLint const COL_LONG = 2; // Loose collision area(longer than COL_LOOSþ
+GLint const COL_LONG = 2; // Long collision area(longer than COL_LOOSE), used for pawn horns.
 
 using namespace std;
 
@@ -82,7 +77,6 @@ void drawCircle(GLfloat x, GLfloat y, GLfloat r) {
 	GLfloat twicePi = 2.0f * 3.14;
 
 	glEnable(GL_LINE_SMOOTH);
-	glLineWidth(5.0);
 
 	glBegin(GL_LINES);
 	for (i = 0; i <= triangleAmount; i++)
@@ -199,11 +193,11 @@ class Agent: public Actor {
 		GLfloat targetY;
 		GLfloat initialScale;
 		GLfloat targetScale;
-		GLint currentRow = 0;
-		GLint stateX = AGENT_IDLE;
-		GLint stateY = AGENT_IDLE;
-		vector<Vertex> blockedSquares;
-		GLint triedToGoBack = 0;
+		GLint currentRow;
+		GLint stateX;
+		GLint stateY;
+		vector<Vertex> blockedSquares; // Movement blocked squares on game layout
+		GLint triedToGoBack; // Agent tried to go wrong direction?
 		GLint deathAnimFlag;
 
 		vector<Vertex> const rotate_up = { Vertex(0.2,0.1), Vertex(0.5,0.9), Vertex(0.8,0.1) };
@@ -221,6 +215,10 @@ class Agent: public Actor {
 			this->blockedSquares = blockedSquares;
 			this->targetScale = scale * 1.75;
 			this->deathAnimFlag = 0;
+			this->currentRow = 0;
+			this->stateX = AGENT_IDLE;
+			this->stateY = AGENT_IDLE;
+			this->triedToGoBack = 0;
 		};
 
 		GLint step(GLint direction) {
@@ -298,6 +296,28 @@ class Agent: public Actor {
 			}
 		}
 
+		// Move agent with a smooth animation
+		void move() {
+			if (this->stateY == AGENT_MOVE) {
+				if (abs(this->offsetY - this->targetY) > 1) {
+					this->offsetY = lerp(this->offsetY, this->targetY, 0.4);
+				}
+				else {
+					this->offsetY = this->targetY;
+					this->stateY = AGENT_IDLE;
+				}
+			}
+			if (this->stateX == AGENT_MOVE) {
+				if (abs(this->offsetX - this->targetX) > 1) {
+					this->offsetX = lerp(this->offsetX, this->targetX, 0.4);
+				}
+				else {
+					this->offsetX = this->targetX;
+					this->stateX = AGENT_IDLE;
+				}
+			}
+		}
+
 		vector<Vertex> getCollisionBound(GLint collisionType) {
 			vector<Vertex> tempVertices;
 			for (vector<Vertex>::iterator vertex = this->vertices.begin(); vertex != this->vertices.end(); ++vertex) {
@@ -317,6 +337,7 @@ class Agent: public Actor {
 		}
 };
 
+// Coin class
 class Coin :public Actor {
 	public:
 		GLint timeout;
@@ -561,39 +582,49 @@ class World {
 		vector<WorldObject*> worldObjects_trees;
 		vector<Coin*> coins;
 		vector<Pawn*> pawns;
-		GLint* worldLayout;
+		GLint* worldLayout; // Stores each row's type (Pavement or road?)
 		GLint wSquareCount;
 		GLint hSquareCount;
 
-		GLint* roadStatus;
-		GLint* roadDirection;
-		GLint* roadSpawnTimeStamps;
+		GLint* roadStatus; // Is the road busy or free to spawn new car?
+		GLint* roadDirection; // What is the traffic flow direction of road?
+		GLint* roadSpawnTimeStamps; // When the last pawn is spawned on the road?
 
-		GLint coinTextTimeout = 0;
-		GLfloat coinTextX = 0;
-		GLfloat coinTextY = 0;
-		GLint score;
+		GLint coinTextTimeout;
+		GLfloat coinTextX;
+		GLfloat coinTextY;
+		GLint score; // Total score of player
 		
 		GLint squareSize;
 		GLint leftSpawnPoint;
 		GLint rightSpawnPoint;
-		GLint frameTimer;
-		GLint state;
+		GLint frameTimer; // Global timer based on frames
+		GLint state; // Game state
 
-		GLint deathAnimDone = 0;
-		GLfloat FOVX = ww;
-		GLfloat LOOKX = 0;
-		GLfloat LOOKY = 0;
-		GLfloat FOVY = wh;
-		GLfloat difficulty;
+		GLint deathAnimDone; // Is agent's death animation completed?
+		GLfloat FOVX; // Field of view on X (used when agent is dead)
+		GLfloat FOVY; // Field of view on Y (used when agent is dead)
+		GLfloat LOOKX; // Look at X (used when agent is dead)
+		GLfloat LOOKY; // Look at Y (used when agent is dead)
+		GLfloat difficulty; // Difficulty of game, decides initial velocity of spawned pawns
 
 		World(GLint squareSize, GLint startDifficulty) {
+			// Init variables:
 			this->squareSize = squareSize;
 			this->leftSpawnPoint = -2 * squareSize;
 			this->rightSpawnPoint = ww;
 			this->difficulty = startDifficulty;
 			this->frameTimer = 0;
 			this->score = 0;
+			this->coinTextTimeout = 0;
+			this->coinTextX = 0;
+			this->coinTextY = 0;
+			this->deathAnimDone = 0;
+			this->FOVX = ww;
+			this->FOVY = wh;
+			this->LOOKX = 0;
+			this->LOOKY = 0;
+
 			initWorld(); // Initialize the world
 		}
 
@@ -769,24 +800,7 @@ class World {
 			}
 
 			// Move agent with a smooth animation
-			if (this->agent->stateY == AGENT_MOVE) {
-				if (abs(this->agent->offsetY - this->agent->targetY) > 1) {
-					this->agent->offsetY = lerp(this->agent->offsetY, this->agent->targetY, 0.4);
-				}
-				else {
-					this->agent->offsetY = this->agent->targetY;
-					this->agent->stateY = AGENT_IDLE;
-				}
-			}
-			if (this->agent->stateX == AGENT_MOVE) {
-				if (abs(this->agent->offsetX - this->agent->targetX) > 1) {
-					this->agent->offsetX = lerp(this->agent->offsetX, this->agent->targetX, 0.4);
-				}
-				else {
-					this->agent->offsetX = this->agent->targetX;
-					this->agent->stateX = AGENT_IDLE;
-				}
-			}
+			this->agent->move();
 
 			// Animate coins
 			vector<GLint> toRemove;
@@ -810,6 +824,41 @@ class World {
 
 			// Check if there exists a collision
 			this->checkCollisions();
+
+			// Agent is dead, do some animation stuff:
+			if (this->state == WORLD_STATE_OVER) {
+				if (!this->agent->triedToGoBack) {
+					if (abs(this->agent->offsetX - this->agent->targetX) > 2) {
+						this->agent->offsetX = lerp(this->agent->offsetX, this->agent->targetX, 0.025);
+					}
+					if (this->agent->deathAnimFlag == 0) {
+						if (abs(this->agent->scale - this->agent->targetScale) > 1) {
+							this->agent->scale = lerp(this->agent->scale, this->agent->targetScale, 0.08);
+						}
+						else {
+							this->agent->deathAnimFlag = 1;
+						}
+					}
+					else {
+						this->agent->scale = lerp(this->agent->scale, this->agent->initialScale, 0.08);
+					}
+				}
+
+				if (this->FOVX < 1000 && this->FOVY < 1000) {
+					this->FOVX = lerp(this->FOVX, 1000, 0.02);
+					this->FOVY = lerp(this->FOVY, 1000, 0.02);
+				}
+				if (this->LOOKX < this->agent->offsetX && this->LOOKY < this->agent->offsetY) {
+					this->LOOKX = lerp(this->LOOKX, -this->agent->offsetX, 0.02);
+					this->LOOKY = lerp(this->LOOKY, -this->agent->offsetY, 0.02);
+				}
+
+				if (this->FOVX > 970 && this->FOVY > 970) {
+					this->deathAnimDone = 1;
+				}
+				glViewport(this->LOOKX, this->LOOKY, this->FOVX, this->FOVY);
+				glutPostRedisplay();
+			}
 		}
 
 		void checkCollisions() {
@@ -889,7 +938,7 @@ class World {
 						// Pawn hits to agent:
 						if (intersectionResult) {
 							ambienceChannel->setVolume(0.15f);
-							FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
+							FMODSystem->playSound(gameOver, 0, false, &effectChannel);
 							FMODSystem->playSound(carHit, 0, false, &effectChannel);
 							this->agent->targetX = this->agent->offsetX + 20 * this->pawns.at(i)->velocity;
 							this->pawns.at(i)->velocity = 0;
@@ -952,49 +1001,25 @@ class World {
 			}
 
 			this->showScore();
+
+			// If death animation of agent is completed, show paraphrase and score on screen:
+			if (this->deathAnimDone) {
+				glColor3f(1.0f, 0.0f, 0.0f);
+				if (this->agent->triedToGoBack) {
+					drawText("Don't be a coward", this->agent->offsetX - this->squareSize * 1.25, this->agent->offsetY + 2 * this->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
+				}
+				else {
+					drawText("WASTED", this->agent->offsetX - this->squareSize / 2, this->agent->offsetY + 2 * this->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
+				}
+				char scoreText[21];
+				sprintf(scoreText, "Your score: %d", this->score);
+				glColor3f(1.0f, 0.0f, 0.0f);
+				drawText(scoreText, this->agent->offsetX - this->squareSize / 1.70, this->agent->offsetY + 1.5 * this->squareSize, GLUT_BITMAP_HELVETICA_18);
+			}
 		}
 };
 
 World *world; // Main world object
-
-void resize(GLsizei w, GLsizei h) {
-	// Do not let user resize the window
-	glutReshapeWindow(ww, wh);
-}
-
-void init(void) {
-	glViewport(0, 0, ww, wh);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluOrtho2D(0.0, (GLdouble)ww, 0.0, (GLdouble)wh);
-	glClearColor(0.0, 0.0, 0.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
-	world = new World(25, 1); // Create game world
-	glFlush();
-}
-
-void display(void) {
-	glClear(GL_COLOR_BUFFER_BIT);
-	world->drawWorld();
-
-	// If death animation of agent is completed, show paraphrase and score on screen:
-	if (world->deathAnimDone) {
-		glColor3f(1.0f, 0.0f, 0.0f);
-		if (world->agent->triedToGoBack) {
-			drawText("Don't be a coward", world->agent->offsetX - world->squareSize * 1.25, world->agent->offsetY + 2 * world->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
-		}
-		else {
-			drawText("WASTED", world->agent->offsetX - world->squareSize / 2, world->agent->offsetY + 2 * world->squareSize, GLUT_BITMAP_TIMES_ROMAN_24);
-		}
-		char scoreText[21];
-		sprintf(scoreText, "Your score: %d", world->score);
-		glColor3f(1.0f, 0.0f, 0.0f);
-		drawText(scoreText, world->agent->offsetX - world->squareSize / 1.70, world->agent->offsetY + 1.5 * world->squareSize, GLUT_BITMAP_HELVETICA_18);
-	}
-
-	glFlush();
-	glutSwapBuffers();
-}
 
 void processSpecialKeys(GLint key, GLint x, GLint y) {
 	// If game is over, ignore player input
@@ -1007,17 +1032,17 @@ void processSpecialKeys(GLint key, GLint x, GLint y) {
 		// Agent tried to go wrong direction:
 		if (world->agent->direction == DIRECTION_DOWN && world->agent->stateY != AGENT_MOVE && world->agent->offsetY != wh - world->squareSize) {
 			ambienceChannel->setVolume(0.15f);
-			FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
+			FMODSystem->playSound(gameOver, 0, false, &effectChannel);
 			world->agent->triedToGoBack = 1;
 			world->state = WORLD_STATE_OVER;
 		}
 		// Move agent:
 		else if (world->agent->step(DIRECTION_UP) == 1 && world->agent->offsetY != wh - world->squareSize) {
 			if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
-				FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+				FMODSystem->playSound(footstepGrass, 0, false, &effectChannel);
 			}
 			else {
-				FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+				FMODSystem->playSound(footstepRoad, 0, false, &effectChannel);
 			}
 			world->score++; // Increase score if direction of agent and movement is same
 		}
@@ -1026,36 +1051,36 @@ void processSpecialKeys(GLint key, GLint x, GLint y) {
 		// Agent tried to go wrong direction:
 		if (world->agent->direction == DIRECTION_UP && world->agent->stateY != AGENT_MOVE && world->agent->offsetY != 0) {
 			ambienceChannel->setVolume(0.15f);
-			FMODSystem->playSound(gameOver, 0, false, &gameOverChannel);
+			FMODSystem->playSound(gameOver, 0, false, &effectChannel);
 			world->agent->triedToGoBack = 1;
 			world->state = WORLD_STATE_OVER;
 		}
 		// Move agent:
 		else if (world->agent->step(DIRECTION_DOWN) == 1 && world->agent->offsetY != 0) {
 			if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
-				FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+				FMODSystem->playSound(footstepGrass, 0, false, &effectChannel);
 			}
 			else {
-				FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+				FMODSystem->playSound(footstepRoad, 0, false, &effectChannel);
 			}
 			world->score++; // Increase score if direction of agent and movement is same
 		}
 		break;
 	case GLUT_KEY_RIGHT:
 		if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
-			FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+			FMODSystem->playSound(footstepGrass, 0, false, &effectChannel);
 		}
 		else {
-			FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+			FMODSystem->playSound(footstepRoad, 0, false, &effectChannel);
 		}
 		world->agent->step(DIRECTION_RIGHT);
 		break;
 	case GLUT_KEY_LEFT:
 		if (world->worldLayout[world->agent->currentRow] == WO_PAVEMENT) {
-			FMODSystem->playSound(footstepGrass, 0, false, &footStepChannel);
+			FMODSystem->playSound(footstepGrass, 0, false, &effectChannel);
 		}
 		else {
-			FMODSystem->playSound(footstepRoad, 0, false, &footStepChannel);
+			FMODSystem->playSound(footstepRoad, 0, false, &effectChannel);
 		}
 		world->agent->step(DIRECTION_LEFT);
 		break;
@@ -1084,63 +1109,47 @@ void mouseInput(GLint button, GLint state, GLint x, GLint y) {
 	}
 }
 
+void resize(GLsizei w, GLsizei h) {
+	// Do not let user resize the window
+	glutReshapeWindow(ww, wh);
+}
+
+void init(void) {
+	glViewport(0, 0, ww, wh);
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	gluOrtho2D(0.0, (GLdouble)ww, 0.0, (GLdouble)wh);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+	world = new World(25, 1); // Create game world
+	glFlush();
+}
+
+void display(void) {
+	glClear(GL_COLOR_BUFFER_BIT);
+	world->drawWorld();
+	glFlush();
+	glutSwapBuffers();
+}
+
 void timer(GLint) {
 	FMODSystem->update(); // Sync FMOD on each frame
-
 	// Agent is alive:
 	if (world->state != WORLD_STATE_PAUSE) {
-		if (world->state == WORLD_STATE_ONEFRAME) {
-			// Draw current frame and pause again
-			world->state = WORLD_STATE_PAUSE;
-		}
 		world->updateWorld();
 		glutPostRedisplay();
-	}
-	// Agent is dead, do some animation stuff:
-	if (world->state == WORLD_STATE_OVER) {
-		if (!world->agent->triedToGoBack) {
-			if (abs(world->agent->offsetX - world->agent->targetX) > 2) {
-				world->agent->offsetX = lerp(world->agent->offsetX, world->agent->targetX, 0.025);
-			}
-			if (world->agent->deathAnimFlag == 0) {
-				if (abs(world->agent->scale - world->agent->targetScale) > 1) {
-					world->agent->scale = lerp(world->agent->scale, world->agent->targetScale, 0.08);
-				}
-				else {
-					world->agent->deathAnimFlag = 1;
-				}
-			}
-			else {
-				world->agent->scale = lerp(world->agent->scale, world->agent->initialScale, 0.08);
-			}
+		// Draw current frame and pause again
+		if (world->state == WORLD_STATE_ONEFRAME) {
+			world->state = WORLD_STATE_PAUSE;
 		}
-
-		if (world->FOVX < 1000 && world->FOVY < 1000) {
-			world->FOVX = lerp(world->FOVX, 1000, 0.02);
-			world->FOVY = lerp(world->FOVY, 1000, 0.02);
-		}
-		if (world->LOOKX < world->agent->offsetX && world->LOOKY < world->agent->offsetY) {
-			world->LOOKX = lerp(world->LOOKX, -world->agent->offsetX, 0.02);
-			world->LOOKY = lerp(world->LOOKY, -world->agent->offsetY, 0.02);
-		}
-
-		if (world->FOVX > 970 && world->FOVY > 970) {
-			world->deathAnimDone = 1;
-		}
-		glViewport(world->LOOKX, world->LOOKY, world->FOVX, world->FOVY);
-		glutPostRedisplay();
 	}
 	glutTimerFunc(1000.0 / 60.0, timer, 0); // 60 FPS
 }
 
 // Initialize sound effects with FMOD
 void initSounds() {
-	unsigned int      version;
-	void             *extradriverdata = 0;
-	result = FMOD::System_Create(&FMODSystem);
-	result = FMODSystem->getVersion(&version);
-
-	FMODSystem->init(32, FMOD_INIT_NORMAL, extradriverdata);
+	FMOD::System_Create(&FMODSystem);
+	FMODSystem->init(32, FMOD_INIT_NORMAL, 0);
 	FMODSystem->createStream("media/ambience.wav", FMOD_DEFAULT, 0, &ambience);
 	ambience->setMode(FMOD_LOOP_NORMAL);                         
 	FMODSystem->createSound("media/gameOver.wav", FMOD_DEFAULT, 0, &gameOver);
@@ -1156,11 +1165,14 @@ void initSounds() {
 
 int main(GLint argc, char** argv) {
 	initSounds();
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowSize(ww, wh);
-	glutCreateWindow("Istanbul Traffic Simulator 2017");
+	glutCreateWindow("A Pedestrian's Tragedy");
+
 	init();
+
 	glutReshapeFunc(resize);
 	glutDisplayFunc(display);
 	glutSpecialFunc(processSpecialKeys);

@@ -6,38 +6,42 @@ A road crossing game developed with OpenGL & FMOD on C++.
 
 ## Contents
 
-I. Basic Implementation Details
+I. Environment Setup
 
-II. Features
+II. Implementation Details
 
-III. Game Rules
+III. Features
 
-IV. Controls
+IV. Game Rules
 
+V. Controls
 
+I. Environment Setup
+---------------------
+- It's assumed that OpenGL and FreeGLUT is already installed correctly on the system. If not, they should be included in project properties. Code should compile on Visual Studio 2017 / Windows 10 without problem.
 
-I. Implementation Details
--------------------------
-Implementation is made on C++, using object oriented approach. 
+- Just launch project by opening "PedestriansTragedy.vcxproj". Environment is ready to compile Main.cpp for this project file.
 
-Coordinate system is implemented with scale, offset and unit polygon of object. Unit polygon is 1x1 presentation of desired object shape. This polygon vertices are multiplied by scale value, and then summed with offset values. Game world is splitted into squares(25x25 in my implementation). Each object's place is initialized with respect to this squared layout. This approach makes my implementation more organized and easy to manipulate.
+- Project must be compiled on x86 mode.
 
-"Actor" is main class for dynamic objects in game world. It stores informations like scale, unit polygon, and offset of the object. "Coin" is class for coins, "pawn" is a class for cars/trucks, and "agent" is the class for player agent. Each of them implements their own functions and stores their own variables. Each of them inherits from "Actor" class.
+- If it's needed to create a project from scratch, fmod_vc.lib library should be included in linker, and FMOD, media folders shold be at same folder with main.cpp. 
 
-"WorldObject" is main class for static objects in game world. It's used for roads, pavements, and trees in the game world.
-
-"World" is main class of the game world. It stores each created object in game world, updates them, and draws required ones to screen. It also handles collisions, animations, game states, scoring etc.
-
-Smooth animations seen in the game are made with some linear interpolation manipulation. With a constant delta value, current point can be interpolated towards target point, and this generated value can be written into current point back. If we repeat this process on each frame until the object reaches it's target position, we will get very smooth transition effect between these two points.
-
-Collisions are handled with orientation tests. For detecting collision between 2 polygons, line segments of these polygons orientation tested with each other. This approach is used for collision of pawn-agent, and pawn-pawn. On the other hand, for detecting coin-agent collision, coin's center point is checked for if it's inside agent's polygon or not. Using a bounding box for circle is not a nice solution, and checking each vertex of circle is not a cheap solution. So, this approach seems like best one to me.
-
-FMOD API is used for sound system implementation.
+- If a standalone exe is needed, media folder and fmod.dll should be on same directory with exe file.
 
 
-II.Features
+II. Implementation Details
+--------------------------
+- Coordinate system is implemented with scale, offset and unit polygon of object. Unit polygon is 1x1 presentation of desired object shape. This polygon vertices are multiplied by scale value, and then summed with offset values. Game world is splitted into squares(25x25 in current implementation). Each object's place is initialized with respect to this squared layout.
+
+- Smooth animations seen in the game are made with some linear interpolation manipulation. 
+
+- Collisions are handled with orientation tests.
+
+- FMOD API is used for sound system implementation.
+
+
+III.Features
 ------------------
-- Cars/Trucks are drawn like a top-down car/truck instead of a rectangle.
 - Trees will appear randomly on pavements, they will block agent's movement.
 - Agent will move with a smooth animation instead of teleporting to target location.
 - Picked coins will fly onto score text at the corner of screen with increasing scale. Idle coins on game world will animate from left to right slowly. Also, a feedback text will appear at the top of picked coin.
@@ -45,10 +49,8 @@ II.Features
 - Spawned cars/trucks will sense each other. They will slow down after getting too close to other cars/trucks.
 - Cars/Trucks will sense agent if it's too close to front side of car/truck. They will honk their horn to agent with %50 chance.
 - Initial velocity of spawned cars/trucks will increase as the time goes by.
-- Agent can rotate to each direction. (instead of just up or down)
-- Various sound effects
 
-III. Game Rules
+IV. Game Rules
 -------------------
 - Player can't go back from it's current direction. If so, game is over immediately.
 - If agent collides with any of car/truck in game world, game is over immediately.
@@ -59,7 +61,7 @@ III. Game Rules
 - Agent cannot pass through center of the trees on pavements.
 
 
-IV. Controls
+V. Controls
 ------------
 - Arrow Keys -> Movement
 - q -> Quit from game

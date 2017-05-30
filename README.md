@@ -8,13 +8,12 @@ A road crossing game developed with OpenGL & FMOD on C++.
 
 I. Environment Setup
 
-II. Implementation Details
+II. Features
 
-III. Features
+III. Game Rules
 
-IV. Game Rules
+IV. Controls
 
-V. Controls
 
 I. Environment Setup
 ---------------------
@@ -29,18 +28,7 @@ I. Environment Setup
 - If a standalone exe is needed, media folder and fmod.dll should be on same directory with exe file.
 
 
-II. Implementation Details
---------------------------
-- Coordinate system is implemented with scale, offset and unit polygon of object. Unit polygon is 1x1 presentation of desired object shape. This polygon vertices are multiplied by scale value, and then summed with offset values. Game world is splitted into squares(25x25 in current implementation). Each object's place is initialized with respect to this squared layout.
-
-- Smooth animations seen in the game are made with some linear interpolation manipulation. 
-
-- Collisions are handled with orientation tests.
-
-- FMOD API is used for sound system implementation.
-
-
-III.Features
+II. Features
 ------------------
 - Trees will appear randomly on pavements, they will block agent's movement.
 - Agent will move with a smooth animation instead of teleporting to target location.
@@ -50,7 +38,7 @@ III.Features
 - Cars/Trucks will sense agent if it's too close to front side of car/truck. They will honk their horn to agent with %50 chance.
 - Initial velocity of spawned cars/trucks will increase as the time goes by.
 
-IV. Game Rules
+III. Game Rules
 -------------------
 - Player can't go back from it's current direction. If so, game is over immediately.
 - If agent collides with any of car/truck in game world, game is over immediately.
@@ -61,7 +49,7 @@ IV. Game Rules
 - Agent cannot pass through center of the trees on pavements.
 
 
-V. Controls
+IV. Controls
 ------------
 - Arrow Keys -> Movement
 - q -> Quit from game

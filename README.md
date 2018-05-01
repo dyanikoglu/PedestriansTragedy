@@ -1,6 +1,6 @@
 ﻿# A Pedestrian's Tragedy
 
-![Game Screenshot](https://i.hizliresim.com/AL9zjX.png)
+![Game Screenshot](https://image.ibb.co/kcQdUS/AL9zjX.png)
 
 A road crossing game developed with OpenGL & FMOD on C++.
 

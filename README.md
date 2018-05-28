@@ -1,4 +1,6 @@
-﻿# A Pedestrian's Tragedy
+### Release can be downloaded from https://github.com/dyanikoglu/PedestriansTragedy/releases/download/Release/Release.zip
+
+# A Pedestrian's Tragedy
 
 ![Game Screenshot](https://image.ibb.co/kcQdUS/AL9zjX.png)
 

@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="SoundManager.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Actor.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Vertex.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Agent.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Coin.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Pawn.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="WorldObject.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="World.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="fmod_vc.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source">
+      <UniqueIdentifier>{58d65711-520e-4874-829d-07cffe9274bb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header">
+      <UniqueIdentifier>{55073364-4891-4d55-b790-f811b7810a6f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SoundManager.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="Actor.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="Vertex.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="Agent.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="Coin.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="Pawn.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="WorldObject.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="World.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+    <ClInclude Include="Tools.hpp">
+      <Filter>Header</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

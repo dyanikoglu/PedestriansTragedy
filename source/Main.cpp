@@ -143,8 +143,6 @@ void timer(GLint) {
 }
 
 int main(GLint argc, char** argv) {
-	//initSounds();
-
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 	glutInitWindowSize(ww, wh);

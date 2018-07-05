@@ -1,70 +1,75 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="Main.cpp" />
-    <ClCompile Include="SoundManager.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Actor.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Vertex.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Agent.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Coin.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Pawn.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="WorldObject.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="World.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="fmod_vc.lib" />
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="Source">
-      <UniqueIdentifier>{58d65711-520e-4874-829d-07cffe9274bb}</UniqueIdentifier>
+    <Filter Include="include">
+      <UniqueIdentifier>{a7b3d290-9ed6-4c1f-b1b8-644b7f2a4572}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header">
-      <UniqueIdentifier>{55073364-4891-4d55-b790-f811b7810a6f}</UniqueIdentifier>
+    <Filter Include="source">
+      <UniqueIdentifier>{484cdf41-5bd7-456f-b21f-f0e3d70d3614}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib">
+      <UniqueIdentifier>{c1e2842f-fd9c-4975-824e-e02469cfffe0}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="SoundManager.hpp">
-      <Filter>Header</Filter>
+    <ClCompile Include="source\Actor.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Agent.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Coin.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Pawn.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\SoundManager.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Vertex.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\World.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\WorldObject.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="source\Main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\Actor.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="Actor.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\Agent.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="Vertex.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\Coin.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="Agent.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\Pawn.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="Coin.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\SoundManager.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="Pawn.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\Tools.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="WorldObject.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\Vertex.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="World.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\World.hpp">
+      <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="Tools.hpp">
-      <Filter>Header</Filter>
+    <ClInclude Include="include\WorldObject.hpp">
+      <Filter>include</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="lib\fmod_vc.lib">
+      <Filter>lib</Filter>
+    </Library>
   </ItemGroup>
 </Project>

@@ -17,13 +17,11 @@ IV. Controls
 
 I. Environment Setup
 ---------------------
-- It's assumed that OpenGL and FreeGLUT is already installed correctly on the system. If not, they should be included in project properties. Code should compile on Visual Studio 2017 / Windows 10 without problem.
+- Solution is created with Visual Studio 2017.
 
-- Just launch project by opening "PedestriansTragedy.vcxproj". Environment is ready to compile Main.cpp for this project file.
+- It's assumed that OpenGL, FreeGLUT and Windows SDK 8.1 is already installed correctly on the system. This guide can be followed to get your dev. environment ready: http://www.cs.uky.edu/~cheng/cs633/OpenGLInstallGuideWindows.pdf
 
 - Project must be compiled on x86 mode.
-
-- If it's needed to create a project from scratch, fmod_vc.lib library should be included in linker, and FMOD, media folders shold be at same folder with main.cpp. 
 
 - If a standalone exe is needed, media folder and fmod.dll should be on same directory with exe file.
 
@@ -60,7 +58,7 @@ IV. Controls
 
 ## Licence
 
-Copyright (C) 2017 Doğa Can YANIKOĞLU
+Copyright (C) 2017-2018 Doğa Can YANIKOĞLU
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 

@@ -21,8 +21,6 @@ I. Environment Setup
 
 - It's assumed that OpenGL, FreeGLUT and Windows SDK 8.1 is already installed correctly on the system. This guide can be followed to get your dev. environment ready: http://www.cs.uky.edu/~cheng/cs633/OpenGLInstallGuideWindows.pdf
 
-- You should add .dll path manually into VS environment. To do that, go to Project Properties -> Configuration Properties -> Debugging -> Environment and set it to **PATH=%PATH%;$(ProjectDir)\lib**. 
-
 - Project must be compiled on x86 mode.
 
 - If a standalone exe is needed, media folder and fmod.dll should be on same directory with exe file.
